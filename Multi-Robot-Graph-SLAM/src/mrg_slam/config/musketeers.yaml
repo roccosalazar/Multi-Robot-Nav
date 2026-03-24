@@ -1,0 +1,309 @@
+# ============================================================
+# Shared parameters for all mrg_slam nodes/components
+# This file is common for athos, porthos and aramis.
+# Robot-specific values such as model_namespace and initial pose
+# should be overwritten from the launch file.
+# ============================================================
+
+/**:
+  ros__parameters:
+    # Robot name.
+    # Keep a placeholder here; it will be overwritten from launch
+    # for each robot instance:
+    # - athos
+    # - porthos
+    # - aramis
+    model_namespace: "athos"
+
+    # Must be true in Gazebo simulation.
+    use_sim_time: true
+
+    points_topic: "velodyne_points"
+
+    # IMU topic in your Clearpath setup.
+    # At the moment IMU frontend is disabled below, so this is not critical yet,
+    # but it is still good to keep it correct.
+    imu_topic: "sensors/imu_0/data"
+
+# ============================================================
+# Static transform publisher between lidar and base_link
+# In your case Clearpath already provides the lidar TF chain:
+# odom -> base_link -> ... -> lidar3d_0_link -> lidar3d_0_laser
+# Therefore this extra publisher must stay disabled,
+# otherwise you risk publishing duplicate/inconsistent TFs.
+# ============================================================
+
+lidar2base_publisher:
+  ros__parameters:
+    enable_lidar2base_publisher: false
+
+    # Unused because publisher is disabled.
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+
+    # These names match your observed TF frames.
+    # They are kept only for clarity/documentation.
+    frame_id: "base_link"
+    child_frame_id: "lidar3d_0_laser"
+
+# ============================================================
+# Transform between global "map" and each robot-local "robot/map"
+# Keep this enabled for multi-robot visualization and map handling.
+# The intent is to have a structure like:
+# map -> athos/map
+# map -> porthos/map
+# map -> aramis/map
+# ============================================================
+
+map2robotmap_publisher:
+  ros__parameters:
+    enable_map2robotmap_publisher: true
+
+    # Leave zero here.
+    # Robot initial pose is handled in mrg_slam_component below
+    # and should be overwritten from launch.
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+
+    # Global frame.
+    # Keep "map" without robot prefix.
+    frame_id: "map"
+
+    # Child map frame.
+    # mrg_slam handles robot-specific map naming internally.
+    child_frame_id: "map"
+
+# ============================================================
+# Point cloud prefiltering
+# These settings are reasonable for your simulated 3D lidar.
+# ============================================================
+
+prefiltering_component:
+  ros__parameters:
+    enable_prefiltering: true
+
+    # In your real observed TF tree the frame is "base_link",
+    # not "athos/base_link".
+    # Keep this exactly as observed for now.
+    base_link_frame: "base_link"
+
+    # Downsampling keeps the cloud lighter for scan matching.
+    # 0.1 m is a good starting point.
+    downsample_method: "VOXELGRID"
+    downsample_resolution: 0.1
+    downsample_min_points_per_voxel: 1
+
+    # Radius outlier removal is a reasonable default in simulation.
+    outlier_removal_method: "RADIUS"
+    statistical_mean_k: 30
+    statistical_stddev: 1.2
+    radius_radius: 0.5
+    radius_min_neighbors: 2
+
+    # Ignore points too close or too far away.
+    enable_distance_filter: true
+    distance_near_thresh: 0.1
+    distance_far_thresh: 35.0
+
+    # Keep deskewing disabled for now.
+    # Your first goal is to get the basic lidar-only SLAM working.
+    enable_deskewing: false
+    scan_period: 0.1
+
+# ============================================================
+# Lidar scan-matching odometry frontend
+# This estimates motion between consecutive point clouds.
+# ============================================================
+
+scan_matching_odometry_component:
+  ros__parameters:
+    enable_scan_matching_odometry: true
+    enable_odom_to_file: false
+
+    # In your observed TF tree the odometry frame is "odom".
+    odom_frame_id: "odom"
+
+    # New keyframe every 1 meter or 30 degrees.
+    # Good starting values.
+    keyframe_delta_translation: 1.0
+    keyframe_delta_angle: 0.5236
+    keyframe_delta_time: 10000.0
+
+    # Keep disabled initially.
+    enable_transform_thresholding: false
+    max_acceptable_translation: 1.0
+    max_acceptable_angle: 1.0
+    max_consecutive_rejections: 5
+
+    # Leave IMU frontend disabled for now.
+    # First make the lidar pipeline work correctly.
+    enable_imu_frontend: false
+
+    # Do not use robot wheel/filtered odometry as initial guess yet.
+    # Keep the first setup simpler.
+    enable_robot_odometry_init_guess: false
+    robot_odom_frame_id: "robot_odom"
+
+    # Keep frontend internal downsampling disabled here.
+    downsample_method: "NONE"
+    downsample_resolution: 0.1
+    downsample_min_points_per_voxel: 1
+
+    # Registration backend.
+    # SMALL_GICP is the intended/default good choice here.
+    registration_method: "SMALL_GICP"
+    reg_num_threads: 8
+    reg_transformation_epsilon: 0.1
+    reg_maximum_iterations: 64
+    reg_max_correspondence_distance: 2.0
+    reg_max_optimizer_iterations: 20
+    reg_use_reciprocal_correspondences: false
+    reg_correspondence_randomness: 20
+    reg_resolution: 1.0
+    reg_nn_search_method: "DIRECT7"
+
+# ============================================================
+# Floor detection
+# Keep disabled initially.
+# ============================================================
+
+floor_detection_component:
+  ros__parameters:
+    enable_floor_detection: false
+
+# ============================================================
+# Main multi-robot graph SLAM backend
+# ============================================================
+
+mrg_slam_component:
+  ros__parameters:
+    enable_mrg_slam: true
+
+    # Robot own name.
+    # Keep a placeholder here; overwrite from launch for each robot.
+    own_name: "athos"
+
+    # All robots participating in the multi-robot system.
+    # This is common to all robot instances, so it stays in this shared file.
+    multi_robot_names: ["athos", "porthos", "aramis"]
+
+    # Remove nearby points belonging to other robots.
+    # Useful in multi-robot simulation to avoid mapping robots as static obstacles.
+    robot_remove_points_radius: 2.0
+
+    # Initial pose placeholder.
+    # IMPORTANT:
+    # these values should be overwritten from launch for each robot
+    # according to the real Gazebo spawn pose.
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+
+    # Keep zero here; launch-provided x/y/z/roll/pitch/yaw should override it.
+    init_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    # Do not use external init pose topics for now.
+    init_odom_topic: "NONE"
+    init_pose_topic: "NONE"
+
+    # Internal SLAM frames.
+    # Keep aligned with your observed TF names for now.
+    map_frame_id: "map"
+    odom_frame_id: "odom"
+
+    # Graph optimization solver.
+    # Leave as default.
+    g2o_solver_type: "lm_var_cholmod"
+    g2o_solver_num_iterations: 512
+    g2o_verbose: false
+
+    # Keep disabled initially.
+    enable_fill_first_cloud: false
+    fill_first_cloud_radius: 5.0
+    fill_first_cloud_simple: false
+
+    # Number of keyframes considered in each update.
+    max_keyframes_per_update: 10000
+
+    # Backend keyframe creation thresholds.
+    keyframe_delta_trans: 1.0
+    keyframe_delta_angle: 0.5236
+
+    # Information matrix for the first node.
+    use_custom_inf_matrix_first_node: true
+    custom_inf_matrix_first_node_stddev: [0.75, 0.75, 0.75, 0.1, 0.1, 0.1]
+
+    # Loop closure candidate thresholds.
+    # Good starting defaults; do not tune yet.
+    candidate_max_xy_distance: 15.0
+    accum_distance_thresh_same_robot: 15.0
+    accum_distance_thresh_other_robot: 5.0
+    fitness_score_max_range: .inf
+    fitness_score_thresh: 1.25
+    use_planar_registration_guess: false
+
+    # Robustification for loop closures.
+    loop_closure_edge_robust_kernel: "Huber"
+    loop_closure_edge_robust_kernel_size: 1.0
+    enable_loop_closure_consistency_check: true
+    loop_closure_consistency_max_delta_trans: 0.3
+    loop_closure_consistency_max_delta_angle: 0.0523599
+
+    # Registration settings used in graph SLAM alignment.
+    registration_method: "SMALL_GICP"
+    reg_num_threads: 8
+    reg_transformation_epsilon: 0.1
+    reg_maximum_iterations: 64
+    reg_max_correspondence_distance: 2.0
+    reg_max_optimizer_iterations: 20
+    reg_use_reciprocal_correspondences: false
+    reg_correspondence_randomness: 20
+    reg_resolution: 1.0
+    reg_nn_search_method: "DIRECT7"
+
+    # Keep all optional extra constraints disabled initially.
+    enable_gps: false
+    enable_imu_orientation: false
+    enable_imu_acceleration: false
+    enable_floor_coeffs: false
+
+    # Odometry edge settings.
+    odometry_edge_robust_kernel: "NONE"
+    odometry_edge_robust_kernel_size: 1.0
+    use_const_inf_matrix: false
+    const_stddev_x: 0.5
+    const_stddev_q: 0.1
+    var_gain_a: 2.0
+    min_stddev_x: 0.1
+    max_stddev_x: 0.75
+    min_stddev_q: 0.05
+    max_stddev_q: 0.2
+
+    # Multi-robot graph exchange policy.
+    # PATH_PROXIMITY is a good default for your scenario.
+    graph_exchange_mode: "PATH_PROXIMITY"
+    graph_request_min_accum_dist: 2.0
+    graph_request_max_robot_dist: 50.0
+    graph_request_min_time_delay: 2.0
+
+    # Global map update settings.
+    graph_update_interval: 3.0
+    map_cloud_update_interval: 5.0
+    map_cloud_resolution: 0.1
+    map_cloud_min_points_per_voxel: 1
+    map_cloud_distance_far_thresh: 10000.0
+
+    # Do not save graph files yet.
+    save_graph: false
+    result_dir: ""

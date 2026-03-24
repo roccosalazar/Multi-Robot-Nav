@@ -1,0 +1,63 @@
+# -----------------------------
+# ROS2 / colcon workspaces
+# -----------------------------
+
+# Root workspace outputs
+/build/
+/install/
+/log/
+
+# Nested workspaces (multi-workspace repos)
+**/build/
+**/install/
+**/log/
+
+# colcon and ament metadata
+**/.colcon/
+**/.ros/
+**/.pytest_cache/
+
+
+# -----------------------------
+# Python artifacts
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+
+# -----------------------------
+# C/C++ / CMake artifacts
+# -----------------------------
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+*.o
+*.obj
+*.a
+*.la
+*.lo
+*.dll
+*.dylib
+*.exe
+
+
+# -----------------------------
+# Editors / OS
+# -----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
