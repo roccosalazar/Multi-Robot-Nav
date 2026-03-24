@@ -1,6 +1,6 @@
 {
   "name": "Humble Desktop-Full", // Name of the dev container configuration
-  "dockerFile": "Dockerfile", // Path to the Dockerfile that defines the container image
+  "dockerFile": "Dockerfile.amd64", // Path to the Dockerfile that defines the container image
   "remoteUser": "ubuntu", // User to use inside the container
   "runArgs": [ // How to run the container
     "--privileged", // Grants extended privileges to the container (necessary for GUI applications)
