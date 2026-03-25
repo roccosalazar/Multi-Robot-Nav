@@ -14,7 +14,9 @@
   "containerEnv": { // Environment variables to set inside the container
     "DISPLAY": "${localEnv:DISPLAY}", // Pass the host's DISPLAY variable to enable GUI applications
     "QT_X11_NO_MITSHM": "1",
-    "ALSOFT_DRIVERS": "null" // Use the null driver for OpenAL to avoid audio issues in the container
+    "ALSOFT_DRIVERS": "null", // Use the null driver for OpenAL to avoid audio issues in the container
+    "ROS_DOMAIN_ID": "0",
+    "ROS_LOCALHOST_ONLY": "0"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/home/ubuntu/${localWorkspaceFolderBasename},type=bind",
   "workspaceFolder": "/home/ubuntu/${localWorkspaceFolderBasename}",
