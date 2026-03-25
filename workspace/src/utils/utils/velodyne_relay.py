@@ -5,7 +5,13 @@ from typing import List
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+    qos_profile_sensor_data,
+)
 from sensor_msgs.msg import PointCloud2
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import Buffer, TransformListener, StaticTransformBroadcaster, TransformException
@@ -32,7 +38,14 @@ class VelodyneRelay(Node):
             f"{self.robot_ns}/lidar3d_0_laser",
         ]
 
-        self.pub = self.create_publisher(PointCloud2, self.output_topic, qos_profile_sensor_data)
+        pub_qos = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.VOLATILE,
+        )
+
+        self.pub = self.create_publisher(PointCloud2, self.output_topic, pub_qos)
         self.sub = self.create_subscription(
             PointCloud2,
             self.input_topic,
