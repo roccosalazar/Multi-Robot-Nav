@@ -124,3 +124,22 @@ RUN sudo apt-get update && sudo apt-get install -y \
     ros-humble-tf2-tools \
     ros-humble-tf2-ros \
     && sudo rm -rf /var/lib/apt/lists/*
+
+### Per nvidia server:
+RUN sudo apt-get update && sudo apt-get install -y \
+    mesa-utils \
+    grep \
+    coreutils \
+    procps \
+    gpg \
+    ca-certificates \
+    x11-apps \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+RUN wget -q -O- https://packagecloud.io/dcommander/virtualgl/gpgkey | \
+    gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/VirtualGL.gpg >/dev/null && \
+    wget -q -O- https://raw.githubusercontent.com/VirtualGL/repo/main/VirtualGL.list | \
+    sudo tee /etc/apt/sources.list.d/VirtualGL.list >/dev/null && \
+    sudo apt-get update && \
+    sudo apt-get install -y virtualgl && \
+    sudo rm -rf /var/lib/apt/lists/*

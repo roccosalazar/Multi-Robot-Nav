@@ -14,6 +14,16 @@ athos:
       publish_geometry_updates: True
       publish_state_updates: True
       publish_transforms_updates: True
+      pilz:
+        cartesian_limits:
+          max_trans_vel: 1.0
+          max_trans_acc: 2.25
+          max_trans_dec: -5.0
+          max_rot_vel: 1.57
+        planning_plugin: 'pilz_industrial_motion_planner/CommandPlanner'
+        request_adapters: ''
+        default_planner_config: 'PTP'
+        capabilities: 'pilz_industrial_motion_planner/MoveGroupSequenceAction pilz_industrial_motion_planner/MoveGroupSequenceService'
       chomp:
         planning_plugin: 'chomp_interface/CHOMPPlanner'
         enable_failure_recovery: True
@@ -28,16 +38,6 @@ athos:
         start_state_max_dt: 0.5
         max_sampling_attempts: 100
       _ompl:
-        planning_plugin: 'ompl_interface/OMPLPlanner'
-        path_tolerance: 0.1
-        resample_dt: 0.1
-        min_angle_change: 0.001
-        default_workspace_bounds: 10.0
-        start_state_max_bounds_error: 0.1
-        start_state_max_dt: 0.5
-        jiggle_fraction: 0.05
-        max_sampling_attempts: 100
-        request_adapters: 'default_planner_request_adapters/AddTimeOptimalParameterization default_planner_request_adapters/ResolveConstraintFrames default_planner_request_adapters/FixWorkspaceBounds default_planner_request_adapters/FixStartStateBounds default_planner_request_adapters/FixStartStateCollision default_planner_request_adapters/FixStartStatePathConstraints'
         planner_configs:
           AnytimePathShortening:
             type: 'geometric::AnytimePathShortening'
@@ -167,16 +167,16 @@ athos:
             sparse_delta_fraction: 0.25
             dense_delta_fraction: 0.001
             max_failures: 5000
-      pilz:
-        planning_plugin: 'pilz_industrial_motion_planner/CommandPlanner'
-        request_adapters: ''
-        default_planner_config: 'PTP'
-        capabilities: 'pilz_industrial_motion_planner/MoveGroupSequenceAction pilz_industrial_motion_planner/MoveGroupSequenceService'
-        cartesian_limits:
-          max_trans_vel: 1.0
-          max_trans_acc: 2.25
-          max_trans_dec: -5.0
-          max_rot_vel: 1.57
+        planning_plugin: 'ompl_interface/OMPLPlanner'
+        path_tolerance: 0.1
+        resample_dt: 0.1
+        min_angle_change: 0.001
+        default_workspace_bounds: 10.0
+        start_state_max_bounds_error: 0.1
+        start_state_max_dt: 0.5
+        jiggle_fraction: 0.05
+        max_sampling_attempts: 100
+        request_adapters: 'default_planner_request_adapters/AddTimeOptimalParameterization default_planner_request_adapters/ResolveConstraintFrames default_planner_request_adapters/FixWorkspaceBounds default_planner_request_adapters/FixStartStateBounds default_planner_request_adapters/FixStartStateCollision default_planner_request_adapters/FixStartStatePathConstraints'
       planning_pipelines: ['chomp', '_ompl', 'pilz']
       default_planning_pipeline: '_ompl'
       allow_trajectory_execution: True

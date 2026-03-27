@@ -49,7 +49,7 @@
 
   <!-- lidar3d_0 -->
   <xacro:include filename="$(find clearpath_sensors_description)/urdf/velodyne_lidar.urdf.xacro"/>
-  <xacro:velodyne_lidar name="lidar3d_0" parent_link="disk_0_mount" ang_res_h="0.4" ang_res_v="2.0" min_ang_h="-3.141592" max_ang_h="3.141592" min_ang_v="-0.261799" max_ang_v="0.261799" min_range="0.9" max_range="130.0" update_rate="50">
+  <xacro:velodyne_lidar name="lidar3d_0" parent_link="disk_0_mount" ang_res_h="0.4" ang_res_v="2.0" min_ang_h="-3.141592" max_ang_h="3.141592" min_ang_v="-0.261799" max_ang_v="0.261799" min_range="0.9" max_range="130.0" update_rate="10">
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </xacro:velodyne_lidar>
 
