@@ -1,0 +1,473 @@
+=== EXTRA_DIAGNOSTICS ===
+2026-03-27T16:24:41+00:00
+
+=== ID_GROUPS ===
+uid=1002(ubuntu) gid=1002(ubuntu) groups=1002(ubuntu),44(video),992,1003
+ubuntu video 992 1003
+
+=== GETENT_GROUP_VIDEO_RENDER_992_1003 ===
+video:x:44:ubuntu
+
+=== DRI_LONG_NUMERIC ===
+total 0
+crw-rw---- 1 0 1003 226,   0 Mar 27 16:19 card0
+crw-rw---- 1 0 1003 226,   1 Mar 27 16:19 card1
+crw-rw---- 1 0 1003 226, 128 Mar 27 16:19 renderD128
+total 0
+crw-rw---- 1 root 1003 226,   0 Mar 27 16:19 card0
+crw-rw---- 1 root 1003 226,   1 Mar 27 16:19 card1
+crw-rw---- 1 root 1003 226, 128 Mar 27 16:19 renderD128
+
+=== NVIDIA_SMI ===
+GPU 0: NVIDIA L40S (UUID: GPU-e64ddd82-0fe8-ff28-794c-96feb62c751c)
+Fri Mar 27 16:24:42 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA L40S                    Off |   000062ED:00:00.0 Off |                    0 |
+| N/A   31C    P0             82W /  350W |    7676MiB /  46068MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+=== EGL_OPENGL_RENDERER ===
+name of display: :1
+display: :1  screen: 0
+direct rendering: Yes
+Memory info (GL_NVX_gpu_memory_info):
+    Dedicated video memory: 46068 MB
+    Total available memory: 46068 MB
+    Currently available dedicated video memory: 37767 MB
+OpenGL vendor string: NVIDIA Corporation
+OpenGL renderer string: NVIDIA L40S/PCIe/SSE2
+OpenGL core profile version string: 4.6.0 NVIDIA 590.48.01
+OpenGL core profile shading language version string: 4.60 NVIDIA
+OpenGL core profile context flags: (none)
+OpenGL core profile profile mask: core profile
+
+OpenGL version string: 4.6.0 NVIDIA 590.48.01
+OpenGL shading language version string: 4.60 NVIDIA
+OpenGL context flags: (none)
+OpenGL profile mask: (none)
+
+OpenGL ES profile version string: OpenGL ES 3.2 NVIDIA 590.48.01
+OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+
+EGL client extensions string:
+    EGL_EXT_platform_base EGL_EXT_device_base EGL_EXT_device_enumeration
+    EGL_EXT_device_query EGL_KHR_client_get_all_proc_addresses
+    EGL_EXT_client_extensions EGL_KHR_debug EGL_KHR_platform_x11
+    EGL_EXT_platform_x11 EGL_EXT_platform_device
+    EGL_MESA_platform_surfaceless EGL_EXT_explicit_device
+    EGL_KHR_platform_gbm EGL_MESA_platform_gbm EGL_EXT_platform_wayland
+    EGL_KHR_platform_wayland EGL_EXT_platform_xcb
+
+GBM platform:
+EGL API version: 1.5
+EGL vendor string: NVIDIA
+EGL version string: 1.5
+EGL client APIs: OpenGL_ES OpenGL
+EGL extensions string:
+    EGL_ANDROID_native_fence_sync EGL_EXT_buffer_age EGL_EXT_client_sync
+    EGL_EXT_create_context_robustness EGL_EXT_image_dma_buf_import
+    EGL_EXT_image_dma_buf_import_modifiers EGL_MESA_image_dma_buf_export
+    EGL_EXT_output_base EGL_EXT_output_drm EGL_EXT_protected_content
+    EGL_EXT_stream_consumer_egloutput EGL_EXT_stream_acquire_mode
+    EGL_EXT_sync_reuse EGL_IMG_context_priority EGL_KHR_config_attribs
+    EGL_KHR_create_context_no_error EGL_KHR_context_flush_control
+    EGL_KHR_create_context EGL_KHR_fence_sync
+    EGL_KHR_get_all_proc_addresses EGL_KHR_partial_update
+    EGL_KHR_swap_buffers_with_damage EGL_KHR_no_config_context
+    EGL_KHR_gl_colorspace EGL_KHR_gl_renderbuffer_image
+    EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_3D_image
+    EGL_KHR_gl_texture_cubemap_image EGL_KHR_image EGL_KHR_image_base
+    EGL_KHR_reusable_sync EGL_KHR_stream EGL_KHR_stream_attrib
+    EGL_KHR_stream_consumer_gltexture EGL_KHR_stream_cross_process_fd
+    EGL_KHR_stream_fifo EGL_KHR_stream_producer_eglsurface
+    EGL_KHR_surfaceless_context EGL_KHR_wait_sync EGL_NV_nvrm_fence_sync
+    EGL_NV_quadruple_buffer EGL_NV_stream_consumer_eglimage
+    EGL_NV_stream_cross_display EGL_NV_stream_cross_object
+    EGL_NV_stream_cross_process EGL_NV_stream_cross_system
+    EGL_NV_stream_dma EGL_NV_stream_flush EGL_NV_stream_metadata
+    EGL_NV_stream_remote EGL_NV_stream_reset EGL_NV_stream_socket
+    EGL_NV_stream_socket_inet EGL_NV_stream_socket_unix
+    EGL_NV_stream_sync EGL_NV_stream_fifo_next
+    EGL_NV_stream_fifo_synchronous EGL_NV_stream_consumer_gltexture_yuv
+    EGL_NV_stream_attrib EGL_NV_stream_origin EGL_NV_system_time
+    EGL_NV_output_drm_flip_event EGL_NV_triple_buffer
+    EGL_NV_robustness_video_memory_purge
+Configurations:
+     bf lv colorbuffer dp st  ms    vis   cav bi  renderable  supported
+  id sz  l  r  g  b  a th cl ns b    id   eat nd gl es es2 vg surfaces 
+---------------------------------------------------------------------
+0x01 32  0  8  8  8  8 24  8  0 0 0x34325241--         y  y  y     win,pb,str
+0x02 32  0  8  8  8  8 24  0  0 0 0x34325241--         y  y  y     win,pb,str
+0x03 32  0  8  8  8  8  0  8  0 0 0x34325241--         y  y  y     win,pb,str
+0x04 32  0  8  8  8  8  0  0  0 0 0x34325241--         y  y  y     win,pb,str
+0x05 32  0  8  8  8  8 24  8  2 1 0x34325241--         y  y  y     win,pb,str
+0x06 32  0  8  8  8  8 24  0  2 1 0x34325241--         y  y  y     win,pb,str
+0x07 32  0  8  8  8  8  0  8  2 1 0x34325241--         y  y  y     win,pb,str
+0x08 32  0  8  8  8  8  0  0  2 1 0x34325241--         y  y  y     win,pb,str
+0x09 32  0  8  8  8  8 24  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x0a 32  0  8  8  8  8 24  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x0b 32  0  8  8  8  8 24  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x0c 32  0  8  8  8  8 24  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x0d 32  0  8  8  8  8 24  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x0e 32  0  8  8  8  8 24  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x0f 32  0  8  8  8  8  0  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x10 32  0  8  8  8  8  0  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x11 32  0  8  8  8  8  0  8  4 1 0x34325241--         y  y  y     win,pb,str
+0x12 32  0  8  8  8  8  0  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x13 32  0  8  8  8  8  0  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x14 32  0  8  8  8  8  0  0  4 1 0x34325241--         y  y  y     win,pb,str
+0x15 32  0  8  8  8  8 24  8  8 1 0x34325241--         y  y  y     win,pb,str
+0x16 32  0  8  8  8  8 24  8  8 1 0x34325241--         y  y  y     win,pb,str
+0x17 32  0  8  8  8  8 24  0  8 1 0x34325241--         y  y  y     win,pb,str
+0x18 32  0  8  8  8  8 24  0  8 1 0x34325241--         y  y  y     win,pb,str
+0x19 32  0  8  8  8  8  0  8  8 1 0x34325241--         y  y  y     win,pb,str
+0x1a 32  0  8  8  8  8  0  8  8 1 0x34325241--         y  y  y     win,pb,str
+0x1b 32  0  8  8  8  8  0  0  8 1 0x34325241--         y  y  y     win,pb,str
+0x1c 32  0  8  8  8  8  0  0  8 1 0x34325241--         y  y  y     win,pb,str
+0x1d 24  0  8  8  8  0 24  8  0 0 0x34325258--         y  y  y     win,pb,str
+0x1e 24  0  8  8  8  0 24  0  0 0 0x34325258--         y  y  y     win,pb,str
+0x1f 24  0  8  8  8  0  0  8  0 0 0x34325258--         y  y  y     win,pb,str
+0x20 24  0  8  8  8  0  0  0  0 0 0x34325258--         y  y  y     win,pb,str
+0x21 24  0  8  8  8  0 24  8  2 1 0x34325258--         y  y  y     win,pb,str
+0x22 24  0  8  8  8  0 24  0  2 1 0x34325258--         y  y  y     win,pb,str
+0x23 24  0  8  8  8  0  0  8  2 1 0x34325258--         y  y  y     win,pb,str
+0x24 24  0  8  8  8  0  0  0  2 1 0x34325258--         y  y  y     win,pb,str
+0x25 24  0  8  8  8  0 24  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x26 24  0  8  8  8  0 24  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x27 24  0  8  8  8  0 24  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x28 24  0  8  8  8  0 24  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x29 24  0  8  8  8  0 24  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x2a 24  0  8  8  8  0 24  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x2b 24  0  8  8  8  0  0  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x2c 24  0  8  8  8  0  0  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x2d 24  0  8  8  8  0  0  8  4 1 0x34325258--         y  y  y     win,pb,str
+0x2e 24  0  8  8  8  0  0  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x2f 24  0  8  8  8  0  0  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x30 24  0  8  8  8  0  0  0  4 1 0x34325258--         y  y  y     win,pb,str
+0x31 24  0  8  8  8  0 24  8  8 1 0x34325258--         y  y  y     win,pb,str
+0x32 24  0  8  8  8  0 24  8  8 1 0x34325258--         y  y  y     win,pb,str
+0x33 24  0  8  8  8  0 24  0  8 1 0x34325258--         y  y  y     win,pb,str
+0x34 24  0  8  8  8  0 24  0  8 1 0x34325258--         y  y  y     win,pb,str
+0x35 24  0  8  8  8  0  0  8  8 1 0x34325258--         y  y  y     win,pb,str
+0x36 24  0  8  8  8  0  0  8  8 1 0x34325258--         y  y  y     win,pb,str
+0x37 24  0  8  8  8  0  0  0  8 1 0x34325258--         y  y  y     win,pb,str
+0x38 24  0  8  8  8  0  0  0  8 1 0x34325258--         y  y  y     win,pb,str
+0x39 16  0  5  6  5  0 24  8  0 0 0x36314752--         y  y  y     win,pb,str
+0x3a 16  0  5  6  5  0 24  0  0 0 0x36314752--         y  y  y     win,pb,str
+0x3b 16  0  5  6  5  0 16  0  0 0 0x36314752--         y  y  y     win,pb,str
+0x3c 16  0  5  6  5  0  0  8  0 0 0x36314752--         y  y  y     win,pb,str
+0x3d 16  0  5  6  5  0  0  0  0 0 0x36314752--         y  y  y     win,pb,str
+0x3e 16  0  5  6  5  0 24  8  2 1 0x36314752--         y  y  y     win,pb,str
+0x3f 16  0  5  6  5  0 24  0  2 1 0x36314752--         y  y  y     win,pb,str
+0x40 16  0  5  6  5  0 16  0  2 1 0x36314752--         y  y  y     win,pb,str
+0x41 16  0  5  6  5  0  0  8  2 1 0x36314752--         y  y  y     win,pb,str
+0x42 16  0  5  6  5  0  0  0  2 1 0x36314752--         y  y  y     win,pb,str
+0x43 16  0  5  6  5  0 24  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x44 16  0  5  6  5  0 24  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x45 16  0  5  6  5  0 24  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x46 16  0  5  6  5  0 24  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x47 16  0  5  6  5  0 24  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x48 16  0  5  6  5  0 24  0  4 1 0x36314752--         y  y  y     win,pb,error: XDG_RUNTIME_DIR not set in the environment.
+error: XDG_RUNTIME_DIR not set in the environment.
+str
+0x49 16  0  5  6  5  0 16  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x4a 16  0  5  6  5  0 16  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x4b 16  0  5  6  5  0 16  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x4c 16  0  5  6  5  0  0  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x4d 16  0  5  6  5  0  0  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x4e 16  0  5  6  5  0  0  8  4 1 0x36314752--         y  y  y     win,pb,str
+0x4f 16  0  5  6  5  0  0  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x50 16  0  5  6  5  0  0  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x51 16  0  5  6  5  0  0  0  4 1 0x36314752--         y  y  y     win,pb,str
+0x52 16  0  5  6  5  0 24  8  8 1 0x36314752--         y  y  y     win,pb,str
+0x53 16  0  5  6  5  0 24  8  8 1 0x36314752--         y  y  y     win,pb,str
+0x54 16  0  5  6  5  0 24  0  8 1 0x36314752--         y  y  y     win,pb,str
+0x55 16  0  5  6  5  0 24  0  8 1 0x36314752--         y  y  y     win,pb,str
+0x56 16  0  5  6  5  0 16  0  8 1 0x36314752--         y  y  y     win,pb,str
+0x57 16  0  5  6  5  0 16  0  8 1 0x36314752--         y  y  y     win,pb,str
+0x58 16  0  5  6  5  0  0  8  8 1 0x36314752--         y  y  y     win,pb,str
+0x59 16  0  5  6  5  0  0  8  8 1 0x36314752--         y  y  y     win,pb,str
+0x5a 16  0  5  6  5  0  0  0  8 1 0x36314752--         y  y  y     win,pb,str
+0x5b 16  0  5  6  5  0  0  0  8 1 0x36314752--         y  y  y     win,pb,str
+
+Wayland platform:
+eglinfo: eglInitialize failed
+
+X11 platform:
+EGL API version: 1.5
+EGL vendor string: NVIDIA
+EGL version string: 1.5
+EGL client APIs: OpenGL_ES OpenGL
+EGL extensions string:
+    EGL_ANDROID_native_fence_sync EGL_EXT_buffer_age EGL_EXT_client_sync
+    EGL_EXT_create_context_robustness EGL_EXT_image_dma_buf_import
+    EGL_EXT_image_dma_buf_import_modifiers EGL_MESA_image_dma_buf_export
+    EGL_EXT_output_base EGL_EXT_stream_acquire_mode EGL_EXT_sync_reuse
+    EGL_IMG_context_priority EGL_KHR_config_attribs
+    EGL_KHR_create_context_no_error EGL_KHR_context_flush_control
+    EGL_KHR_create_context EGL_KHR_fence_sync
+    EGL_KHR_get_all_proc_addresses EGL_KHR_partial_update
+    EGL_KHR_swap_buffers_with_damage EGL_KHR_no_config_context
+    EGL_KHR_gl_colorspace EGL_KHR_gl_renderbuffer_image
+    EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_3D_image
+    EGL_KHR_gl_texture_cubemap_image EGL_KHR_image EGL_KHR_image_base
+    EGL_KHR_image_pixmap EGL_KHR_reusable_sync EGL_KHR_stream
+    EGL_KHR_stream_attrib EGL_KHR_stream_consumer_gltexture
+    EGL_KHR_stream_cross_process_fd EGL_KHR_stream_fifo
+    EGL_KHR_stream_producer_eglsurface EGL_KHR_surfaceless_context
+    EGL_KHR_wait_sync EGL_NV_nvrm_fence_sync EGL_NV_post_sub_buffer
+    EGL_NV_quadruple_buffer EGL_NV_stream_consumer_eglimage
+    EGL_NV_stream_cross_display EGL_NV_stream_cross_object
+    EGL_NV_stream_cross_process EGL_NV_stream_cross_system
+    EGL_NV_stream_dma EGL_NV_stream_flush EGL_NV_stream_metadata
+    EGL_NV_stream_remote EGL_NV_stream_reset EGL_NV_stream_socket
+    EGL_NV_stream_socket_inet EGL_NV_stream_socket_unix
+    EGL_NV_stream_sync EGL_NV_stream_fifo_next
+    EGL_NV_stream_fifo_synchronous EGL_NV_stream_consumer_gltexture_yuv
+    EGL_NV_stream_attrib EGL_NV_stream_origin EGL_NV_system_time
+    EGL_NV_output_drm_flip_event EGL_NV_triple_buffer
+    EGL_NV_robustness_video_memory_purge
+Configurations:
+     bf lv colorbuffer dp st  ms    vis   cav bi  renderable  supported
+  id sz  l  r  g  b  a th cl ns b    id   eat nd gl es es2 vg surfaces 
+---------------------------------------------------------------------
+0x01 32  0  8  8  8  8 24  8  0 0 0x24--         y  y  y     win,pb,pix,str
+0x02 32  0  8  8  8  8 24  8  0 0 0x9a--         y  y  y     win,pb,pix,str
+0x03 32  0  8  8  8  8 24  8  0 0 0x5f--         y  y  y     win,pb,pix,str
+0x04 32  0  8  8  8  8 24  0  0 0 0x28--         y  y  y     win,pb,pix,str
+0x05 32  0  8  8  8  8 24  0  0 0 0x9e--         y  y  y     win,pb,pix,str
+0x06 32  0  8  8  8  8 24  0  0 0 0x63--         y  y  y     win,pb,pix,str
+0x07 32  0  8  8  8  8  0  0  0 0 0x2c--         y  y  y     win,pb,pix,str
+0x08 32  0  8  8  8  8  0  0  0 0 0xa2--         y  y  y     win,pb,pix,str
+0x09 32  0  8  8  8  8  0  0  0 0 0x67--         y  y  y     win,pb,pix,str
+0x0a 32  0  8  8  8  8 24  8  2 1 0x38--         y  y  y     win,pb,str
+0x0b 32  0  8  8  8  8 24  8  2 1 0xae--         y  y  y     win,pb,str
+0x0c 32  0  8  8  8  8 24  8  2 1 0x73--         y  y  y     win,pb,str
+0x0d 32  0  8  8  8  8 24  0  2 1 0x30--         y  y  y     win,pb,str
+0x0e 32  0  8  8  8  8 24  0  2 1 0xa6--         y  y  y     win,pb,str
+0x0f 32  0  8  8  8  8 24  0  2 1 0x6b--         y  y  y     win,pb,str
+0x10 32  0  8  8  8  8 24  8  4 1 0x3a--         y  y  y     win,pb,str
+0x11 32  0  8  8  8  8 24  8  4 1 0xb0--         y  y  y     win,pb,str
+0x12 32  0  8  8  8  8 24  8  4 1 0x75--         y  y  y     win,pb,str
+0x13 32  0  8  8  8  8 24  0  4 1 0x32--         y  y  y     win,pb,str
+0x14 32  0  8  8  8  8 24  0  4 1 0xa8--         y  y  y     win,pb,str
+0x15 32  0  8  8  8  8 24  0  4 1 0x6d--         y  y  y     win,pb,str
+0x16 32  0  8  8  8  8 24  8  8 1 0x44--         y  y  y     win,pb,str
+0x17 32  0  8  8  8  8 24  8  8 1 0xba--         y  y  y     win,pb,str
+0x18 32  0  8  8  8  8 24  8  8 1 0x7f--         y  y  y     win,pb,str
+0x19 32  0  8  8  8  8 24  0  8 1 0x40--         y  y  y     win,pb,str
+0x1a 32  0  8  8  8  8 24  0  8 1 0xb6--         y  y  y     win,pb,str
+0x1b 32  0  8  8  8  8 24  0  8 1 0x7b--         y  y  y     win,pb,str
+0x1c 32  0  8  8  8  8 24  8 16 1 0x4c--         y  y  y     win,pb,str
+0x1d 32  0  8  8  8  8 24  8 16 1 0xc2--         y  y  y     win,pb,str
+0x1e 32  0  8  8  8  8 24  8 16 1 0x87--         y  y  y     win,pb,str
+0x1f 32  0  8  8  8  8 24  0 16 1 0x48--         y  y  y     win,pb,str
+0x20 32  0  8  8  8  8 24  0 16 1 0xbe--         y  y  y     win,pb,str
+0x21 32  0  8  8  8  8 24  0 16 1 0x83--         y  y  y     win,pb,str
+0x22 32  0  8  8  8  8 24  8 32 1 0x54--         y  y  y     win,pb,str
+0x23 32  0  8  8  8  8 24  8 32 1 0xca--         y  y  y     win,pb,str
+0x24 32  0  8  8  8  8 24  8 32 1 0x8f--         y  y  y     win,pb,str
+0x25 32  0  8  8  8  8 24  0 32 1 0x50--         y  y  y     win,pb,str
+0x26 32  0  8  8  8  8 24  0 32 1 0xc6--         y  y  y     win,pb,str
+0x27 32  0  8  8  8  8 24  0 32 1 0x8b--         y  y  y     win,pb,str
+0x28 32  0  8  8  8  8 24  8 64 1 0x5c--         y  y  y     win,pb,str
+0x29 32  0  8  8  8  8 24  8 64 1 0xd2--         y  y  y     win,pb,str
+0x2a 32  0  8  8  8  8 24  8 64 1 0x97--         y  y  y     win,pb,str
+0x2b 32  0  8  8  8  8 24  0 64 1 0x58--         y  y  y     win,pb,str
+0x2c 32  0  8  8  8  8 24  0 64 1 0xce--         y  y  y     win,pb,str
+0x2d 32  0  8  8  8  8 24  0 64 1 0x93--         y  y  y     win,pb,str
+0x2e 24  0  8  8  8  0 24  8  0 0 0x21--         y  y  y     win,pb,pix,str
+0x2f 24  0  8  8  8  0 24  8  0 0 0x23--         y  y  y     win,pb,pix,str
+0x30 24  0  8  8  8  0 24  8  0 0 0x22--         y  y  y     win,pb,pix,str
+0x31 24  0  8  8  8  0 24  0  0 0 0x27--         y  y  y     win,pb,pix,str
+0x32 24  0  8  8  8  0 24  0  0 0 0x9d--         y  y  y     win,pb,pix,str
+0x33 24  0  8  8  8  0 24  0  0 0 0x62--         y  y  y     win,pb,pix,str
+0x34 24  0  8  8  8  0  0  0  0 0 0x2b--         y  y  y     win,pb,pix,str
+0x35 24  0  8  8  8  0  0  0  0 0 0xa1--         y  y  y     win,pb,pix,str
+0x36 24  0  8  8  8  0  0  0  0 0 0x66--         y  y  y     win,pb,pix,str
+0x37 24  0  8  8  8  0 24  8  2 1 0x37--         y  y  y     win,pb,str
+0x38 24  0  8  8  8  0 24  8  2 1 0xad--         y  y  y     win,pb,str
+0x39 24  0  8  8  8  0 24  8  2 1 0x72--         y  y  y     win,pb,str
+0x3a 24  0  8  8  8  0 24  0  2 1 0x2f--         y  y  y     win,pb,str
+0x3b 24  0  8  8  8  0 24  0  2 1 0xa5--         y  y  y     win,pb,str
+0x3c 24  0  8  8  8  0 24  0  2 1 0x6a--         y  y  y     win,pb,str
+0x3d 24  0  8  8  8  0 24  8  4 1 0x39--         y  y  y     win,pb,str
+0x3e 24  0  8  8  8  0 24  8  4 1 0xaf--         y  y  y     win,pb,str
+0x3f 24  0  8  8  8  0 24  8  4 1 0x74--         y  y  y     win,pb,str
+0x40 24  0  8  8  8  0 24  0  4 1 0x31--         y  y  y     win,pb,str
+0x41 24  0  8  8  8  0 24  0  4 1 0xa7--         y  y  y     win,pb,str
+0x42 24  0  8  8  8  0 24  0  4 1 0x6c--         y  y  y     win,pb,str
+0x43 24  0  8  8  8  0 24  8  8 1 0x43--         y  y  y     win,pb,str
+0x44 24  0  8  8  8  0 24  8  8 1 0xb9--         y  y  y     win,pb,str
+0x45 24  0  8  8  8  0 24  8  8 1 0x7e--         y  y  y     win,pb,str
+0x46 24  0  8  8  8  0 24  0  8 1 0x3f--         y  y  y     win,pb,str
+0x47 24  0  8  8  8  0 24  0  8 1 0xb5--         y  y  y     win,pb,str
+0x48 24  0  8  8  8  0 24  0  8 1 0x7a--         y  y  y     win,pb,str
+0x49 24  0  8  8  8  0 24  8 16 1 0x4b--         y  y  y     win,pb,str
+0x4a 24  0  8  8  8  0 24  8 16 1 0xc1--         y  y  y     win,pb,str
+0x4b 24  0  8  8  8  0 24  8 16 1 0x86--         y  y  y     win,pb,str
+0x4c 24  0  8  8  8  0 24  0 16 1 0x47--         y  y  y     win,pb,str
+0x4d 24  0  8  8  8  0 24  0 16 1 0xbd--         y  y  y     win,pb,str
+0x4e 24  0  8  8  8  0 24  0 16 1 0x82--         y  y  y     win,pb,str
+0x4f 24  0  8  8  8  0 24  8 32 1 0x53--         y  y  y     win,pb,str
+0x50 24  0  8  8  8  0 24  8 32 1 0xc9--         y  y  y     win,pb,str
+0x51 24  0  8  8  8  0 24  8 32 1 0x8e--         y  y  y     win,pb,str
+0x52 24  0  8  8  8  0 24  0 32 1 0x4f--         y  y  y     win,pb,str
+0x53 24  0  8  8  8  0 24  0 32 1 0xc5--         y  y  y     win,pb,str
+0x54 24  0  8  8  8  0 24  0 32 1 0x8a--         y  y  y     win,pb,str
+0x55 24  0  8  8  8  0 24  8 64 1 0x5b--         y  y  y     win,pb,str
+0x56 24  0  8  8  8  0 24  8 64 1 0xd1--         y  y  y     win,pb,str
+0x57 24  0  8  8  8  0 24  8 64 1 0x96--         y  y  y     win,pb,str
+0x58 24  0  8  8  8  0 24  0 64 1 0x57--         y  y  y     win,pb,str
+0x59 24  0  8  8  8  0 24  0 64 1 0xcd--         y  y  y     win,pb,str
+0x5a 24  0  8  8  8  0 24  0 64 1 0x92--         y  y  y     win,pb,str
+0x5b 16  0  5  6  5  0 24  8  0 0 0x00--         y  y  y     pb,str
+0x5c 16  0  5  6  5  0 24  0  0 0 0x00--         y  y  y     pb,str
+0x5d 16  0  5  6  5  0 16  0  0 0 0x00--         y  y  y     pb,str
+0x5e 16  0  5  6  5  0  0  0  0 0 0x00--         y  y  y     pb,str
+
+Device platform:
+EGL API version: 1.5
+EGL vendor string: NVIDIA
+EGL version string: 1.5
+EGL client APIs: OpenGL_ES OpenGL
+EGL extensions string:
+    EGL_ANDROID_native_fence_sync EGL_EXT_buffer_age EGL_EXT_client_sync
+    EGL_EXT_create_context_robustness EGL_EXT_image_dma_buf_import
+    EGL_EXT_image_dma_buf_import_modifiers EGL_MESA_image_dma_buf_export
+    EGL_EXT_output_base EGL_EXT_output_drm EGL_EXT_protected_content
+    EGL_EXT_stream_consumer_egloutput EGL_EXT_stream_acquire_mode
+    EGL_EXT_sync_reuse EGL_IMG_context_priority EGL_KHR_config_attribs
+    EGL_KHR_create_context_no_error EGL_KHR_context_flush_control
+    EGL_KHR_create_context EGL_KHR_fence_sync
+    EGL_KHR_get_all_proc_addresses EGL_KHR_partial_update
+    EGL_KHR_swap_buffers_with_damage EGL_KHR_no_config_context
+    EGL_KHR_gl_colorspace EGL_KHR_gl_renderbuffer_image
+    EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_3D_image
+    EGL_KHR_gl_texture_cubemap_image EGL_KHR_image EGL_KHR_image_base
+    EGL_KHR_reusable_sync EGL_KHR_stream EGL_KHR_stream_attrib
+    EGL_KHR_stream_consumer_gltexture EGL_KHR_stream_cross_process_fd
+    EGL_KHR_stream_fifo EGL_KHR_stream_producer_eglsurface
+    EGL_KHR_surfaceless_context EGL_KHR_wait_sync EGL_NV_nvrm_fence_sync
+    EGL_NV_quadruple_buffer EGL_NV_stream_consumer_eglimage
+    EGL_NV_stream_cross_display EGL_NV_stream_cross_object
+    EGL_NV_stream_cross_process EGL_NV_stream_cross_system
+    EGL_NV_stream_dma EGL_NV_stream_flush EGL_NV_stream_metadata
+    EGL_NV_stream_remote EGL_NV_stream_reset EGL_NV_stream_socket
+    EGL_NV_stream_socket_inet EGL_NV_stream_socket_unix
+    EGL_NV_stream_sync EGL_NV_stream_fifo_next
+    EGL_NV_stream_fifo_synchronous EGL_NV_stream_consumer_gltexture_yuv
+    EGL_NV_stream_attrib EGL_NV_stream_origin EGL_NV_system_time
+    EGL_NV_output_drm_flip_event EGL_NV_triple_buffer
+    EGL_NV_robustness_video_memory_purge
+Configurations:
+     bf lv colorbuffer dp st  ms    vis   cav bi  renderable  supported
+  id sz  l  r  g  b  a th cl ns b    id   eat nd gl es es2 vg surfaces 
+---------------------------------------------------------------------
+0x01 32  0  8  8  8  8 24  8  0 0 0x00--         y  y  y     pb,str
+0x02 32  0  8  8  8  8 24  0  0 0 0x00--         y  y  y     pb,str
+0x03 32  0  8  8  8  8  0  8  0 0 0x00--         y  y  y     pb,str
+0x04 32  0  8  8  8  8  0  0  0 0 0x00--         y  y  y     pb,str
+0x05 32  0  8  8  8  8 24  8  2 1 0x00--         y  y  y     pb,str
+0x06 32  0  8  8  8  8 24  0  2 1 0x00--         y  y  y     pb,str
+0x07 32  0  8  8  8  8  0  8  2 1 0x00--         y  y  y     pb,str
+0x08 32  0  8  8  8  8  0  0  2 1 0x00--         y  y  y     pb,str
+0x09 32  0  8  8  8  8 24  8  4 1 0x00--         y  y  y     pb,str
+0x0a 32  0  8  8  8  8 24  8  4 1 0x00--         y  y  y     pb,str
+0x0b 32  0  8  8  8  8 24  8  4 1 0x00--         y  y  y     pb,str
+0x0c 32  0  8  8  8  8 24  0  4 1 0x00--         y  y  y     pb,str
+0x0d 32  0  8  8  8  8 24  0  4 1 0x00--         y  y  y     pb,str
+0x0e 32  0  8  8  8  8 24  0  4 1 0x00--         y  y  y     pb,str
+0x0f 32  0  8  8  8  8  0  8  4 1 0x00--         y  y  y     pb,str
+0x10 32  0  8  8  8  8  0  8  4 1 0x00--         y  y  y     pb,str
+0x11 32  0  8  8  8  8  0  8  4 1 0x00--         y  y  y     pb,str
+0x12 32  0  8  8  8  8  0  0  4 1 0x00--         y  y  y     pb,str
+0x13 32  0  8  8  8  8  0  0  4 1 0x00--         y  y  y     pb,str
+0x14 32  0  8  8  8  8  0  0  4 1 0x00--         y  y  y     pb,str
+0x15 32  0  8  8  8  8 24  8  8 1 0x00--         y  y  y     pb,str
+0x16 32  0  8  8  8  8 24  8  8 1 0x00--         y  y  y     pb,str
+0x17 32  0  8  8  8  8 24  0  8 1 0x00--         y  y  y     pb,str
+0x18 32  0  8  8  8  8 24  0  8 1 0x00--         y  y  y     pb,str
+0x19 32  0  8  8  8  8  0  8  8 1 0x00--         y  y  y     pb,str
+0x1a 32  0  8  8  8  8  0  8  8 1 0x00--         y  y  y     pb,str
+0x1b 32  0  8  8  8  8  0  0  8 1 0x00--         y  y  y     pb,str
+0x1c 32  0  8  8  8  8  0  0  8 1 0x00--         y  y  y     pb,str
+0x1d 24  0  8  8  8  0 24  8  0 0 0x00--         y  y  y     pb,str
+0x1e 24  0  8  8  8  0 24  0  0 0 0x00--         y  y  y     pb,str
+0x1f 24  0  8  8  8  0  0  8  0 0 0x00--         y  y  y     pb,str
+0x20 24  0  8  8  8  0  0  0  0 0 0x00--         y  y  y     pb,str
+0x21 24  0  8  8  8  0 24  8  2 1 0x00--         y  y  y     pb,str
+0x22 24  0  8  8  8  0 24  0  2 1 0x00--         y  y  y     pb,str
+0x23 24  0  8  8  8  0  0  8  2 1 0x00--         y  y  y     pb,str
+0x24 24  0  8  8  8  0  0  0  2 1 0x00--         y  y  y     pb,str
+0x25 24  0  8  8  8  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x26 24  0  8  8  8  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x27 24  0  8  8  8  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x28 24  0  8  8  8  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x29 24  0  8  8  8  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x2a 24  0  8  8  8  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x2b 24  0  8  8  8  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x2c 24  0  8  8  8  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x2d 24  0  8  8  8  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x2e 24  0  8  8  8  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x2f 24  0  8  8  8  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x30 24  0  8  8  8  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x31 24  0  8  8  8  0 24  8  8 1 0x00--         y  y  y     pb,str
+0x32 24  0  8  8  8  0 24  8  8 1 0x00--         y  y  y     pb,str
+0x33 24  0  8  8  8  0 24  0  8 1 0x00--         y  y  y     pb,str
+0x34 24  0  8  8  8  0 24  0  8 1 0x00--         y  y  y     pb,str
+0x35 24  0  8  8  8  0  0  8  8 1 0x00--         y  y  y     pb,str
+0x36 24  0  8  8  8  0  0  8  8 1 0x00--         y  y  y     pb,str
+0x37 24  0  8  8  8  0  0  0  8 1 0x00--         y  y  y     pb,str
+0x38 24  0  8  8  8  0  0  0  8 1 0x00--         y  y  y     pb,str
+0x39 16  0  5  6  5  0 24  8  0 0 0x00--         y  y  y     pb,str
+0x3a 16  0  5  6  5  0 24  0  0 0 0x00--         y  y  y     pb,str
+0x3b 16  0  5  6  5  0 16  0  0 0 0x00--         y  y  y     pb,str
+0x3c 16  0  5  6  5  0  0  8  0 0 0x00--         y  y  y     pb,str
+0x3d 16  0  5  6  5  0  0  0  0 0 0x00--         y  y  y     pb,str
+0x3e 16  0  5  6  5  0 24  8  2 1 0x00--         y  y  y     pb,str
+0x3f 16  0  5  6  5  0 24  0  2 1 0x00--         y  y  y     pb,str
+0x40 16  0  5  6  5  0 16  0  2 1 0x00--         y  y  y     pb,str
+0x41 16  0  5  6  5  0  0  8  2 1 0x00--         y  y  y     pb,str
+0x42 16  0  5  6  5  0  0  0  2 1 0x00--         y  y  y     pb,str
+0x43 16  0  5  6  5  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x44 16  0  5  6  5  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x45 16  0  5  6  5  0 24  8  4 1 0x00--         y  y  y     pb,str
+0x46 16  0  5  6  5  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x47 16  0  5  6  5  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x48 16  0  5  6  5  0 24  0  4 1 0x00--         y  y  y     pb,str
+0x49 16  0  5  6  5  0 16  0  4 1 0x00--         y  y  y     pb,str
+0x4a 16  0  5  6  5  0 16  0  4 1 0x00--         y  y  y     pb,str
+0x4b 16  0  5  6  5  0 16  0  4 1 0x00--         y  y  y     pb,str
+0x4c 16  0  5  6  5  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x4d 16  0  5  6  5  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x4e 16  0  5  6  5  0  0  8  4 1 0x00--         y  y  y     pb,str
+0x4f 16  0  5  6  5  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x50 16  0  5  6  5  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x51 16  0  5  6  5  0  0  0  4 1 0x00--         y  y  y     pb,str
+0x52 16  0  5  6  5  0 24  8  8 1 0x00--         y  y  y     pb,str
+0x53 16  0  5  6  5  0 24  8  8 1 0x00--         y  y  y     pb,str
+0x54 16  0  5  6  5  0 24  0  8 1 0x00--         y  y  y     pb,str
+0x55 16  0  5  6  5  0 24  0  8 1 0x00--         y  y  y     pb,str
+0x56 16  0  5  6  5  0 16  0  8 1 0x00--         y  y  y     pb,str
+0x57 16  0  5  6  5  0 16  0  8 1 0x00--         y  y  y     pb,str
+0x58 16  0  5  6  5  0  0  8  8 1 0x00--         y  y  y     pb,str
+0x59 16  0  5  6  5  0  0  8  8 1 0x00--         y  y  y     pb,str
+0x5a 16  0  5  6  5  0  0  0  8 1 0x00--         y  y  y     pb,str
+0x5b 16  0  5  6  5  0  0  0  8 1 0x00--         y  y  y     pb,str
+

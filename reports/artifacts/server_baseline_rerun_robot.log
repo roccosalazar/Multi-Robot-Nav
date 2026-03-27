@@ -1,0 +1,104 @@
+[INFO] [launch]: All log files can be found below /home/ubuntu/.ros/log/2026-03-27-16-36-26-233449-blender-Virtual-Machine-11372
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [11376]
+[INFO] [spawner-2]: process started with pid [11378]
+[INFO] [spawner-3]: process started with pid [11380]
+[INFO] [ekf_node-4]: process started with pid [11382]
+[INFO] [marker_server-5]: process started with pid [11384]
+[INFO] [twist_mux-6]: process started with pid [11386]
+[INFO] [joy_linux_node-7]: process started with pid [11388]
+[INFO] [teleop_node-8]: process started with pid [11390]
+[INFO] [parameter_bridge-9]: process started with pid [11392]
+[INFO] [parameter_bridge-10]: process started with pid [11394]
+[INFO] [parameter_bridge-11]: process started with pid [11396]
+[INFO] [imu_filter_madgwick_node-12]: process started with pid [11398]
+[INFO] [parameter_bridge-13]: process started with pid [11400]
+[INFO] [static_transform_publisher-14]: process started with pid [11402]
+[INFO] [create-15]: process started with pid [11404]
+[INFO] [tf_prefix_relay-16]: process started with pid [11406]
+[INFO] [velodyne_relay-17]: process started with pid [11408]
+[twist_mux-6] [INFO] [1774629387.171149760] [aramis.twist_mux]: Topic handler 'topics.external' subscribed to topic 'cmd_vel': timeout = 0.500000s , priority = 1.
+[twist_mux-6] [INFO] [1774629387.177588137] [aramis.twist_mux]: Topic handler 'topics.interactive_marker' subscribed to topic 'twist_marker_server/cmd_vel': timeout = 0.500000s , priority = 8.
+[teleop_node-8] [INFO] [1774629387.178870242] [TeleopTwistJoy]: Teleop enable button 5.
+[teleop_node-8] [INFO] [1774629387.179080101] [TeleopTwistJoy]: Linear axis x on 5 at scale 0.500000.
+[teleop_node-8] [INFO] [1774629387.179144045] [TeleopTwistJoy]: Angular axis yaw on 2 at scale 0.500000.
+[marker_server-5] [INFO] [1774629387.179687361] [aramis.twist_server_node]: [interactive_marker_twist_server] Initialized.
+[twist_mux-6] [INFO] [1774629387.180207881] [aramis.twist_mux]: Topic handler 'topics.joy' subscribed to topic 'joy_teleop/cmd_vel': timeout = 0.500000s , priority = 10.
+[twist_mux-6] [INFO] [1774629387.182757443] [aramis.twist_mux]: Topic handler 'topics.rc' subscribed to topic 'rc_teleop/cmd_vel': timeout = 0.500000s , priority = 12.
+[twist_mux-6] [INFO] [1774629387.184334663] [aramis.twist_mux]: Topic handler 'locks.e_stop' subscribed to topic 'platform/emergency_stop': timeout = None , priority = 255.
+[create-15] [INFO] [1774629387.186458033] [aramis.ros_gz_sim]: Requesting list of world names.
+[static_transform_publisher-14] [INFO] [1774629387.191893277] [aramis.lidar3d_0_static_tf]: Spinning until stopped - publishing transform
+[static_transform_publisher-14] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-14] rotation: ('0.000000', '0.000000', '0.000000', '1.000000')
+[static_transform_publisher-14] from 'lidar3d_0_link' to 'aramis/robot/base_link/lidar3d_0'
+[joy_linux_node-7] [WARN] [1774629387.195658335] [aramis.joy_node]: Couldn't open joystick force feedback: Bad file descriptor
+[joy_linux_node-7] [INFO] [1774629387.195964177] [aramis.joy_node]: Opened joystick: /dev/input/js0. deadzone_: 0.050000.
+[imu_filter_madgwick_node-12] [INFO] [1774629387.197151250] [aramis.imu_filter_node]: Starting ImuFilter
+[imu_filter_madgwick_node-12] [INFO] [1774629387.199634670] [aramis.imu_filter_node]: Using dt computed from message headers
+[imu_filter_madgwick_node-12] [INFO] [1774629387.199682038] [aramis.imu_filter_node]: The gravity vector is kept in the IMU message.
+[imu_filter_madgwick_node-12] [INFO] [1774629387.200062518] [aramis.imu_filter_node]: Imu filter gain set to 0.100000
+[imu_filter_madgwick_node-12] [INFO] [1774629387.200084532] [aramis.imu_filter_node]: Gyro drift bias set to 0.000000
+[imu_filter_madgwick_node-12] [INFO] [1774629387.200090901] [aramis.imu_filter_node]: Magnetometer bias values: 0.000000 0.000000 0.000000
+[robot_state_publisher-1] [INFO] [1774629387.249690111] [aramis.robot_state_publisher]: got segment base_link
+[robot_state_publisher-1] [INFO] [1774629387.249895040] [aramis.robot_state_publisher]: got segment chassis_link
+[robot_state_publisher-1] [INFO] [1774629387.249906543] [aramis.robot_state_publisher]: got segment default_mount
+[robot_state_publisher-1] [INFO] [1774629387.249911964] [aramis.robot_state_publisher]: got segment diff_link
+[robot_state_publisher-1] [INFO] [1774629387.249917351] [aramis.robot_state_publisher]: got segment disk_0_link
+[robot_state_publisher-1] [INFO] [1774629387.249921677] [aramis.robot_state_publisher]: got segment disk_0_mount
+[robot_state_publisher-1] [INFO] [1774629387.249925873] [aramis.robot_state_publisher]: got segment front_left_wheel_link
+[robot_state_publisher-1] [INFO] [1774629387.249930297] [aramis.robot_state_publisher]: got segment front_right_wheel_link
+[robot_state_publisher-1] [INFO] [1774629387.249934792] [aramis.robot_state_publisher]: got segment imu_0_link
+[robot_state_publisher-1] [INFO] [1774629387.249939157] [aramis.robot_state_publisher]: got segment left_diff_unit_headlight_link
+[robot_state_publisher-1] [INFO] [1774629387.249943232] [aramis.robot_state_publisher]: got segment left_diff_unit_link
+[robot_state_publisher-1] [INFO] [1774629387.249947419] [aramis.robot_state_publisher]: got segment left_diff_unit_taillight_link
+[robot_state_publisher-1] [INFO] [1774629387.249951441] [aramis.robot_state_publisher]: got segment lidar3d_0_laser
+[robot_state_publisher-1] [INFO] [1774629387.249955470] [aramis.robot_state_publisher]: got segment lidar3d_0_link
+[robot_state_publisher-1] [INFO] [1774629387.249959367] [aramis.robot_state_publisher]: got segment post_0_link
+[robot_state_publisher-1] [INFO] [1774629387.249963296] [aramis.robot_state_publisher]: got segment post_0_mount
+[robot_state_publisher-1] [INFO] [1774629387.249967327] [aramis.robot_state_publisher]: got segment rear_left_wheel_link
+[robot_state_publisher-1] [INFO] [1774629387.249971343] [aramis.robot_state_publisher]: got segment rear_right_wheel_link
+[robot_state_publisher-1] [INFO] [1774629387.249975232] [aramis.robot_state_publisher]: got segment right_diff_unit_headlight_link
+[robot_state_publisher-1] [INFO] [1774629387.249979138] [aramis.robot_state_publisher]: got segment right_diff_unit_link
+[robot_state_publisher-1] [INFO] [1774629387.249982892] [aramis.robot_state_publisher]: got segment right_diff_unit_taillight_link
+[robot_state_publisher-1] [INFO] [1774629387.249986877] [aramis.robot_state_publisher]: got segment structure_link
+[robot_state_publisher-1] [INFO] [1774629387.249990711] [aramis.robot_state_publisher]: got segment top_tower_link
+[robot_state_publisher-1] [INFO] [1774629387.249995200] [aramis.robot_state_publisher]: got segment tower_link
+[parameter_bridge-9] [INFO] [1774629387.258185940] [aramis.cmd_vel_bridge]: Creating GZ->ROS Bridge: [aramis/cmd_vel (ignition.msgs.Twist) -> aramis/cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-10] [INFO] [1774629387.259333229] [aramis.odom_base_tf_bridge]: Creating GZ->ROS Bridge: [/model/aramis/robot/tf (ignition.msgs.Pose_V) -> /model/aramis/robot/tf (tf2_msgs/msg/TFMessage)] (Lazy 0)
+[parameter_bridge-9] [INFO] [1774629387.262876927] [aramis.cmd_vel_bridge]: Creating ROS->GZ Bridge: [/model/aramis/robot/cmd_vel (geometry_msgs/msg/Twist) -> /model/aramis/robot/cmd_vel (ignition.msgs.Twist)] (Lazy 0)
+[create-15] [INFO] [1774629387.390226846] [aramis.ros_gz_sim]: Waiting messages on topic [robot_description].
+[create-15] [INFO] [1774629387.411310575] [aramis.ros_gz_sim]: Requested creation of entity.
+[create-15] [INFO] [1774629387.411432151] [aramis.ros_gz_sim]: OK creation of entity.
+[spawner-3] [INFO] [1774629387.526895669] [aramis.spawner_platform_velocity_controller]: waiting for service /aramis/controller_manager/list_controllers to become available...
+[INFO] [create-15]: process has finished cleanly [pid 11404]
+[spawner-2] [INFO] [1774629387.545177171] [aramis.spawner_joint_state_broadcaster]: waiting for service /aramis/controller_manager/list_controllers to become available...
+[velodyne_relay-17] [INFO] [1774629387.601909884] [velodyne_relay]: Velodyne relay started for robot='aramis' (/aramis/sensors/lidar3d_0/points -> /aramis/velodyne_points, frame=aramis/velodyne)
+[tf_prefix_relay-16] [INFO] [1774629387.618233671] [tf_prefix_relay]: TF prefix relay started with robot_prefix='aramis', subscribing to '/aramis/tf' and '/aramis/tf_static', publishing to '/tf' and '/tf_static'
+[parameter_bridge-13] [INFO] [1774629388.203402659] [aramis.sensors.lidar3d_0_gz_bridge]: Creating GZ->ROS Bridge: [/aramis/sensors/lidar3d_0/scan (gz.msgs.LaserScan) -> lidar3d_0/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-13] [INFO] [1774629388.216704855] [aramis.sensors.lidar3d_0_gz_bridge]: Creating GZ->ROS Bridge: [/aramis/sensors/lidar3d_0/scan/points (gz.msgs.PointCloudPacked) -> lidar3d_0/points (sensor_msgs/msg/PointCloud2)] (Lazy 0)
+[parameter_bridge-11] [INFO] [1774629388.265653697] [aramis.imu_0_gz_bridge]: Creating GZ->ROS Bridge: [/aramis/sensors/imu_0/data (gz.msgs.IMU) -> sensors/imu_0/data (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-11] [INFO] [1774629388.282833687] [aramis.imu_0_gz_bridge]: Creating GZ->ROS Bridge: [/aramis/sensors/imu_0/data_raw (gz.msgs.IMU) -> sensors/imu_0/data_raw (sensor_msgs/msg/Imu)] (Lazy 0)
+[imu_filter_madgwick_node-12] [WARN] [1774629388.445263923] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[velodyne_relay-17] [INFO] [1774629388.585229017] [velodyne_relay]: Published static TF: aramis/base_link -> aramis/velodyne (copied from aramis/base_link -> aramis/lidar3d_0_laser)
+[imu_filter_madgwick_node-12] [WARN] [1774629389.515258263] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.191174362] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.265311655] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.337931848] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.407226935] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.479110242] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.550994914] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[spawner-3] [INFO] [1774629393.554702358] [aramis.spawner_platform_velocity_controller]: [94mLoaded [1mplatform_velocity_controller[0m
+[imu_filter_madgwick_node-12] [WARN] [1774629393.703892474] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.777751273] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.847049119] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.911870887] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629393.981395129] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629394.047839969] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [WARN] [1774629394.112485140] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[spawner-2] [INFO] [1774629394.115237015] [aramis.spawner_joint_state_broadcaster]: [94mLoaded [1mjoint_state_broadcaster[0m
+[imu_filter_madgwick_node-12] [WARN] [1774629394.187958256] [aramis.imu_filter_node]: The IMU seems to be in free fall, cannot determine gravity direction!
+[imu_filter_madgwick_node-12] [INFO] [1774629394.248891727] [aramis.imu_filter_node]: First IMU message received.
+[spawner-3] [INFO] [1774629396.125325870] [aramis.spawner_platform_velocity_controller]: [92mConfigured and activated [1mplatform_velocity_controller[0m
+[INFO] [spawner-3]: process has finished cleanly [pid 11380]
+[spawner-2] [INFO] [1774629397.108004328] [aramis.spawner_joint_state_broadcaster]: [92mConfigured and activated [1mjoint_state_broadcaster[0m
+[INFO] [spawner-2]: process has finished cleanly [pid 11378]

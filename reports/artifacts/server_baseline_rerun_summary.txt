@@ -1,0 +1,1 @@
+server_baseline_rerun avg=0.0421 min=0.0402 max=0.0439 n=12

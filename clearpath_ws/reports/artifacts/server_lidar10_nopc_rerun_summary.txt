@@ -1,0 +1,1 @@
+server_lidar10_nopc_rerun avg=0.0203 min=0.0028 max=0.0833 n=12
