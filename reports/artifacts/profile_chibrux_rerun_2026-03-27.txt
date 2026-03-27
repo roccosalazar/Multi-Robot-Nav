@@ -1,0 +1,118 @@
+=== DATE ===
+2026-03-27T15:03:49+00:00
+
+=== CPU ===
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           46 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  22
+On-line CPU(s) list:                     0-21
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) Ultra 7 155H
+CPU family:                              6
+Model:                                   170
+Thread(s) per core:                      2
+Core(s) per socket:                      16
+Socket(s):                               1
+Stepping:                                4
+CPU max MHz:                             4800.0000
+CPU min MHz:                             400.0000
+BogoMIPS:                                5990.40
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid bus_lock_detect movdiri movdir64b fsrm md_clear serialize arch_lbr ibt flush_l1d arch_capabilities
+Virtualization:                          VT-x
+L1d cache:                               544 KiB (14 instances)
+L1i cache:                               896 KiB (14 instances)
+L2 cache:                                18 MiB (9 instances)
+L3 cache:                                24 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-21
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS Not affected; BHI BHI_DIS_S
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+
+=== RAM ===
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       5.4Gi       4.8Gi       1.9Gi       4.9Gi       7.3Gi
+Swap:          4.0Gi       679Mi       3.3Gi
+
+=== DISK ===
+NAME          SIZE TYPE MOUNTPOINT             MODEL
+loop0       196.9M loop                        
+loop1       197.2M loop                        
+loop2         1.6G loop                        
+loop3         1.6G loop                        
+loop4           4K loop                        
+loop5       358.2M loop                        
+loop6       346.1M loop                        
+loop7        63.8M loop                        
+loop8        63.8M loop                        
+loop9          74M loop                        
+loop10       66.9M loop                        
+loop11         74M loop                        
+loop12       66.8M loop                        
+loop13      116.9M loop                        
+loop14      116.6M loop                        
+loop15       16.4M loop                        
+loop16      137.2M loop                        
+loop17       18.5M loop                        
+loop18      139.9M loop                        
+loop19      516.2M loop                        
+loop20      669.8M loop                        
+loop21      606.1M loop                        
+loop22      531.4M loop                        
+loop23        3.3M loop                        
+loop24       91.7M loop                        
+loop25        395M loop                        
+loop26       10.8M loop                        
+loop27      290.8M loop                        
+loop28       48.4M loop                        
+loop29        576K loop                        
+loop30       15.5M loop                        
+loop31       48.1M loop                        
+loop32        576K loop                        
+loop33        2.5M loop                        
+nvme0n1     953.9G disk                        WD PC SN740 SDDPNQD-1T00-1127           
+├─nvme0n1p1     1G part                        
+└─nvme0n1p2 952.8G part /home/ubuntu/clearpath 
+
+=== GPU_LSPCI ===
+
+=== GPU_NVIDIA_SMI ===
+
+=== DRI_AND_GROUPS ===
+uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),44(video),992
+total 0
+crw-rw---- 1 0  44 226,   1 Mar 27 14:52 card1
+crw-rw---- 1 0 992 226, 128 Mar 27 14:52 renderD128
+
+=== OS ===
+Linux chibrux 6.17.0-19-generic #19~24.04.2-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar  6 23:08:46 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=jammy

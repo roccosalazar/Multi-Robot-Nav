@@ -261,9 +261,9 @@ Compilare questa tabella su entrambi i PC:
 | Server VM NVIDIA | Baseline | 0.0462 | 0.0428 | 0.0528 | Si | Si |
 | Server VM NVIDIA | LiDAR10 | 0.6025 | 0.4640 | 0.8365 | Si | Si |
 | Server VM NVIDIA | LiDAR10 no PC2 | 0.6937 | 0.5725 | 0.7701 | Si | No |
-| Laptop Intel | Baseline | TBD | TBD | TBD | TBD | Si |
-| Laptop Intel | LiDAR10 | TBD | TBD | TBD | TBD | Si |
-| Laptop Intel | LiDAR10 no PC2 | TBD | TBD | TBD | TBD | No |
+| Chibrux devcontainer (Intel Arc host) | Baseline | 1.0000 | 0.9998 | 1.0002 | No | Si |
+| Chibrux devcontainer (Intel Arc host) | LiDAR10 | 1.0000 | 0.9999 | 1.0001 | No | Si |
+| Chibrux devcontainer (Intel Arc host) | LiDAR10 no PC2 | 1.0000 | 1.0000 | 1.0000 | No | No |
 
 ## 13) Conclusione finale
 Il test A/B/C isola chiaramente due contributi principali al degrado:
@@ -271,3 +271,49 @@ Il test A/B/C isola chiaramente due contributi principali al degrado:
 2. costo del bridge PointCloud2
 
 La differenza residua tra macchine, a parita di codice, e molto probabilmente legata al path grafico effettivo e al contesto VM/container, evidenziato dai warning EGL e dal mismatch gruppi device /dev/dri nel server testato.
+
+## 14) Rerun completo su chibrux (devcontainer) - da zero
+Run eseguiti in data 2026-03-27 con spawn esplicito di world e robot in ogni scenario:
+1. world: `ros2 launch musketeers_bringup spawn_world.launch.py world:=warehouse`
+2. robot: `ros2 launch musketeers_bringup spawn_robot.launch.py world:=warehouse generate:=false`
+3. campionamento: 12 campioni da `/world/warehouse/stats`
+
+Tag usati:
+1. `chibrux_baseline_rerun`
+2. `chibrux_lidar10_rerun`
+3. `chibrux_lidar10_nopc_rerun`
+
+Artifact archiviati:
+1. `reports/artifacts/profile_chibrux_rerun_2026-03-27.txt`
+2. `reports/artifacts/chibrux_baseline_rerun_world.log`
+3. `reports/artifacts/chibrux_baseline_rerun_robot.log`
+4. `reports/artifacts/chibrux_baseline_rerun_stats.txt`
+5. `reports/artifacts/chibrux_lidar10_rerun_world.log`
+6. `reports/artifacts/chibrux_lidar10_rerun_robot.log`
+7. `reports/artifacts/chibrux_lidar10_rerun_stats.txt`
+8. `reports/artifacts/chibrux_lidar10_nopc_rerun_world.log`
+9. `reports/artifacts/chibrux_lidar10_nopc_rerun_robot.log`
+10. `reports/artifacts/chibrux_lidar10_nopc_rerun_stats.txt`
+
+Verifiche di correttezza run:
+1. spawn robot confermato (`ros_gz_sim create` con `OK creation of entity`)
+2. baseline e LiDAR10: bridge LaserScan + PointCloud2 presenti nel `parameter_bridge`
+3. LiDAR10 no PC2: assente bridge `scan/points` nel `parameter_bridge` (presente solo LaserScan)
+4. warning EGL/DRI assenti nei tre `world.log`
+
+Nota ambiente container:
+1. `lspci` non disponibile nel devcontainer durante il profiling
+2. `nvidia-smi` non disponibile (atteso su host Intel Arc)
+3. device `/dev/dri` visibili e accessibili ai gruppi dell'utente container
+
+## 15) Confronto server vs chibrux: cosa cambia e perche il server potente va peggio
+Differenze osservate direttamente dai dati:
+1. Baseline: chibrux ~1.0000 vs server 0.0462 ($\approx 21.65\times$)
+2. LiDAR10: chibrux ~1.0000 vs server 0.6025 ($\approx 1.66\times$)
+3. LiDAR10 no PC2: chibrux ~1.0000 vs server 0.6937 ($\approx 1.44\times$)
+
+Spiegazione tecnica piu probabile:
+1. Il server e in ambiente virtualizzato (hypervisor Microsoft) con warning EGL/DRI nei log: il path di rendering sensori GPU e penalizzato o in fallback.
+2. Su chibrux i warning EGL/DRI non compaiono: il path grafico/sensori risulta stabile e il sistema resta realtime anche con robot+sensori+bridge.
+3. Il collo di bottiglia del server non e la sola "potenza teorica" CPU/GPU, ma l'interazione tra virtualizzazione, driver stack grafico e accesso ai device nel container.
+4. Su chibrux il test va in "ceiling" di metrica (RTF vicino a 1.0), quindi le differenze tra B e C diventano poco visibili pur essendo il setup diverso.
