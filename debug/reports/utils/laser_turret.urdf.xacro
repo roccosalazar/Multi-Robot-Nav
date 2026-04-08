@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="laser_turret">
+  <!-- This file is included directly as platform extras in the robot URDF. -->
+
+  <!-- Main dark metallic finish for structural shells and heavy parts. -->
+  <material name="mat_dark_gunmetal">
+    <color rgba="0.18 0.20 0.23 1"/>
+  </material>
+
+  <!-- Mid-tone metallic finish for secondary armor panels and supports. -->
+  <material name="mat_mid_gunmetal">
+    <color rgba="0.30 0.33 0.37 1"/>
+  </material>
+
+  <!-- Neutral dark material for mechanical interfaces and high-contrast details. -->
+  <material name="mat_black">
+    <color rgba="0.08 0.08 0.09 1"/>
+  </material>
+
+  <!-- Front laser aperture glass material. -->
+  <material name="mat_laser_glass">
+    <color rgba="0.10 0.85 0.65 1"/>
+  </material>
+
+  <!-- Auxiliary sensor glass material. -->
+  <material name="mat_sensor_glass">
+    <color rgba="0.20 0.55 0.95 1"/>
+  </material>
+
+  <!-- Fixed base pedestal of the turret. -->
+  <link name="turret_base_link">
+    <!-- Main cylindrical base body. -->
+    <visual>
+      <origin xyz="0 0 0.035" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.115" length="0.07"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Upper rotation collar to visually separate base and yaw assembly. -->
+    <visual>
+      <origin xyz="0 0 0.0725" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.090" length="0.015"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Collision for the main base body. -->
+    <collision>
+      <origin xyz="0 0 0.035" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.115" length="0.07"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the upper collar. -->
+    <collision>
+      <origin xyz="0 0 0.0725" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.090" length="0.015"/>
+      </geometry>
+    </collision>
+
+    <!-- Inertial properties for the full base. -->
+    <inertial>
+      <origin xyz="0 0 0.040" rpy="0 0 0"/>
+      <mass value="2.6"/>
+      <inertia ixx="0.0105" ixy="0" ixz="0" iyy="0.0105" iyz="0" izz="0.0140"/>
+    </inertial>
+  </link>
+
+  <!-- Fixed attachment of the turret base to the arm plate mount. -->
+  <joint name="turret_mount_joint" type="fixed">
+    <parent link="arm_plate_mount"/>
+    <child link="turret_base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rotating yaw head. Cylindrical lower body, side ears, pitch motor housings and improved lidar support. -->
+  <link name="turret_yaw_head_link">
+    <!-- Main flattened cylindrical core body. Radius chosen so the ears remain visually inside the disc footprint without moving them. -->
+    <visual>
+      <origin xyz="0 0 0.010" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.020"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Left main ear of the pitch fork. -->
+    <visual>
+      <origin xyz="0 -0.067 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.026 0.158"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Right main ear of the pitch fork. -->
+    <visual>
+      <origin xyz="0 0.067 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.026 0.158"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Left local thickening around the pitch pivot area. -->
+    <visual>
+      <origin xyz="0 -0.056 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.015 0.045"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Right local thickening around the pitch pivot area. -->
+    <visual>
+      <origin xyz="0 0.056 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.015 0.045"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Left upper cap on the ear. -->
+    <visual>
+      <origin xyz="0 -0.067 0.126" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.034 0.027 0.014"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Right upper cap on the ear. -->
+    <visual>
+      <origin xyz="0 0.067 0.126" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.034 0.027 0.014"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Horizontal crossbar connecting the two ears below the lidar disk. This greatly improves the visual connection of the upper lidar platform. -->
+    <visual>
+      <origin xyz="0 0 0.145" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.010" length="0.110"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Short vertical central post between crossbar and lidar disk. -->
+    <visual>
+      <origin xyz="0 0 0.157" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.012" length="0.02"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Top disk reserved for future lidar installation. -->
+    <visual>
+      <origin xyz="0 0 0.169" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.060" length="0.012"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Left outer motor housing disk for the pitch joint. -->
+    <visual>
+      <origin xyz="0 -0.052 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.034" length="0.010"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Left inner hub cap of the pitch joint motor housing. -->
+    <visual>
+      <origin xyz="0 -0.046 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.008"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Right outer motor housing disk for the pitch joint. -->
+    <visual>
+      <origin xyz="0 0.052 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.034" length="0.010"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Right inner hub cap of the pitch joint motor housing. -->
+    <visual>
+      <origin xyz="0 0.046 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.008"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Main collision body for the cylindrical yaw head core. -->
+    <collision>
+      <origin xyz="0 0 0.010" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.085" length="0.020"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for left ear. -->
+    <collision>
+      <origin xyz="0 -0.067 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.026 0.145"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for right ear. -->
+    <collision>
+      <origin xyz="0 0.067 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.026 0.145"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for left pivot reinforcement block. -->
+    <collision>
+      <origin xyz="0 -0.056 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.015 0.045"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for right pivot reinforcement block. -->
+    <collision>
+      <origin xyz="0 0.056 0.078" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.015 0.045"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the upper crossbar. -->
+    <collision>
+      <origin xyz="0 0 0.145" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.010" length="0.110"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the short central lidar support post. -->
+    <collision>
+      <origin xyz="0 0 0.153" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.012" length="0.016"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for lidar support disk. -->
+    <collision>
+      <origin xyz="0 0 0.165" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.060" length="0.012"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for left outer motor housing disk. -->
+    <collision>
+      <origin xyz="0 -0.052 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.034" length="0.010"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for right outer motor housing disk. -->
+    <collision>
+      <origin xyz="0 0.052 0.078" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.034" length="0.010"/>
+      </geometry>
+    </collision>
+
+    <!-- Inertial properties updated to match the cylindrical lower body, taller ears and improved lidar support structure. -->
+    <inertial>
+      <origin xyz="0.000 0 0.070" rpy="0 0 0"/>
+      <mass value="1.98"/>
+      <inertia ixx="0.0069" ixy="0" ixz="0" iyy="0.0069" iyz="0" izz="0.0056"/>
+    </inertial>
+  </link>
+
+  <!-- Dedicated mount frame on top surface of the lidar support disk. -->
+  <link name="turret_lidar_mount"/>
+  <joint name="turret_lidar_mount_joint" type="fixed">
+    <parent link="turret_yaw_head_link"/>
+    <child link="turret_lidar_mount"/>
+    <origin xyz="0 0 0.175" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Continuous yaw motion around the vertical axis. -->
+  <joint name="turret_yaw_joint" type="continuous">
+    <parent link="turret_base_link"/>
+    <child link="turret_yaw_head_link"/>
+    <origin xyz="0 0 0.085" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <!-- TODO: If you want to limit yaw rotation, change type="continuous" to type="revolute" and add a <limit lower="..." upper="..." effort="..." velocity="..."/> block here. -->
+  </joint>
+
+  <!-- Pitching laser payload module. Rear section redesigned with a larger rounded tail integrated into the main body. -->
+  <link name="turret_laser_module_link">
+    <!-- Main laser module body. -->
+    <visual>
+      <origin xyz="0.085 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.18 0.072 0.072"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Rear rounded tail integrated into the module body. -->
+    <visual>
+      <origin xyz="-0.005 0 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.036" length="0.072"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Left pivot hub seated inside the fork. -->
+    <visual>
+      <origin xyz="0 -0.036 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.016"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Right pivot hub seated inside the fork. -->
+    <visual>
+      <origin xyz="0 0.036 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.016"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Front transition shroud between body and long barrel. -->
+    <visual>
+      <origin xyz="0.180 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.030" length="0.040"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Main long laser barrel. -->
+    <visual>
+      <origin xyz="0.310 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.022" length="0.220"/>
+      </geometry>
+      <material name="mat_mid_gunmetal"/>
+    </visual>
+
+    <!-- Right-side camera support arm running parallel to the barrel near the front. -->
+    <visual>
+      <origin xyz="0.375 -0.044 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.034 0.032 0.012"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Small connector block between barrel and support arm. -->
+    <visual>
+      <origin xyz="0.375 -0.026 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.012 0.018"/>
+      </geometry>
+      <material name="mat_dark_gunmetal"/>
+    </visual>
+
+    <!-- Front emitter head. -->
+    <visual>
+      <origin xyz="0.430 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.028" length="0.035"/>
+      </geometry>
+      <material name="mat_black"/>
+    </visual>
+
+    <!-- Final laser aperture. -->
+    <visual>
+      <origin xyz="0.452 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.010"/>
+      </geometry>
+      <material name="mat_laser_glass"/>
+    </visual>
+
+    <!-- Collision for the main laser module body. -->
+    <collision>
+      <origin xyz="0.085 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.18 0.072 0.072"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the integrated rear rounded tail. -->
+    <collision>
+      <origin xyz="-0.005 0 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.036" length="0.072"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the left pivot hub. -->
+    <collision>
+      <origin xyz="0 -0.036 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.016"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the right pivot hub. -->
+    <collision>
+      <origin xyz="0 0.036 0" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.016" length="0.016"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the front transition shroud. -->
+    <collision>
+      <origin xyz="0.180 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.030" length="0.040"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the long laser barrel. -->
+    <collision>
+      <origin xyz="0.310 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.022" length="0.220"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for right-side camera support arm. -->
+    <collision>
+      <origin xyz="0.375 -0.044 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.054 0.032 0.012"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for barrel-to-support connector block. -->
+    <collision>
+      <origin xyz="0.375 -0.026 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.012 0.018"/>
+      </geometry>
+    </collision>
+
+    <!-- Collision for the front emitter head. -->
+    <collision>
+      <origin xyz="0.430 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.028" length="0.035"/>
+      </geometry>
+    </collision>
+
+    <!-- Inertial properties updated to account for the larger integrated rear body. -->
+    <inertial>
+      <origin xyz="0.120 0 0.000" rpy="0 0 0"/>
+      <mass value="1.34"/>
+      <inertia ixx="0.0020" ixy="0" ixz="0" iyy="0.0086" iyz="0" izz="0.0086"/>
+    </inertial>
+  </link>
+
+  <!-- Camera mount frame centered on top of the right-side support arm. -->
+  <link name="turret_camera_mount"/>
+  <joint name="turret_camera_mount_joint" type="fixed">
+    <parent link="turret_laser_module_link"/>
+    <child link="turret_camera_mount"/>
+    <origin xyz="0.375 -0.044 0.006" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Continuous pitch rotation around the local Y axis. -->
+  <joint name="turret_pitch_joint" type="continuous">
+    <parent link="turret_yaw_head_link"/>
+    <child link="turret_laser_module_link"/>
+    <origin xyz="0.000 0 0.078" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <!-- TODO: If you want to limit pitch rotation, change type="continuous" to type="revolute" and add a <limit lower="..." upper="..." effort="..." velocity="..."/> block here. -->
+  </joint>
+</robot>
