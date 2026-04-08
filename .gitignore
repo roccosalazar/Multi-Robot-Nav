@@ -63,9 +63,7 @@ Makefile
 Thumbs.db
 
 # Ignore everything in robots folder
-/robots/*
-
-# But keep robots.yaml files in robot subdirectories
-!/robots/*/
-!/robots/*/robot.yaml
+/robots/**
 !/robots/
+!/robots//
+!/robots//robot.yaml
