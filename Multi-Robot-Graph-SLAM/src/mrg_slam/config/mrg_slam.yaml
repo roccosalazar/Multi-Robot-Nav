@@ -1,6 +1,10 @@
 # Parameters shared across all nodes or general parameters
 /**:
   ros__parameters:
+    # Clearpath TF is namespaced per robot
+    tf_topics_in_model_namespace: false
+    # Keep frame ids unprefixed (base_link, odom, map, lidar3d_0_laser)
+    prefix_frames_with_model_namespace: true
     model_namespace: "bestla" # is going to be used as namespace for all topics and tf frames
     use_sim_time: true # true for rosbags and for gazebo
     points_topic: "velodyne_points"

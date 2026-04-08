@@ -6,7 +6,6 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
 
 
 ARGUMENTS = [
@@ -41,7 +40,7 @@ def generate_launch_description() -> LaunchDescription:
 		PythonLaunchDescriptionSource(robot_spawn_launch),
 		launch_arguments={
 			'use_sim_time': LaunchConfiguration('use_sim_time'),
-			'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'clearpath', LaunchConfiguration('robot_name')]),
+			'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'Multi-Robot-Nav/robots', LaunchConfiguration('robot_name')]),
 			'world': LaunchConfiguration('world'),
 			'rviz': LaunchConfiguration('rviz'),
 			'x': LaunchConfiguration('x'),
@@ -52,28 +51,10 @@ def generate_launch_description() -> LaunchDescription:
 		}.items()
 	)
 
-	robot_tf_relay = Node(
-		package='utils',
-		executable='tf_prefix_relay',
-		name='tf_prefix_relay',
-		parameters=[{'robot_ns': LaunchConfiguration('robot_name')}],
-		output='screen',
-	)
-
-	robot_velodyne_relay = Node(
-		package='utils',
-		executable='velodyne_relay',
-		name='velodyne_relay',
-		parameters=[{'robot_ns': LaunchConfiguration('robot_name')}],
-		output='screen',
-	)
-
 	ld = LaunchDescription(ARGUMENTS)
 	if _has_nvidia():
 		ld.add_action(SetEnvironmentVariable('__NV_PRIME_RENDER_OFFLOAD', '1'))
 		ld.add_action(SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'))
 	ld.add_action(robot_spawn)
-	ld.add_action(robot_tf_relay)
-	ld.add_action(robot_velodyne_relay)
 
 	return ld

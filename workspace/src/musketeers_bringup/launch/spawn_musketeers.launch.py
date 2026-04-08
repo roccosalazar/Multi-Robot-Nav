@@ -4,7 +4,6 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
-from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 
@@ -37,7 +36,7 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(robot_spawn_launch),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'clearpath', 'aramis']),
+            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'Multi-Robot-Nav/robots', 'aramis']),
             'world': LaunchConfiguration('world'),
             'rviz': LaunchConfiguration('rviz'),
             'x': '-3.0',
@@ -52,7 +51,7 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(robot_spawn_launch),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'clearpath', 'athos']),
+            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'Multi-Robot-Nav/robots', 'athos']),
             'world': LaunchConfiguration('world'),
             'rviz': LaunchConfiguration('rviz'),
             'x': '0.0',
@@ -67,7 +66,7 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(robot_spawn_launch),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'clearpath', 'porthos']),
+            'setup_path': PathJoinSubstitution([EnvironmentVariable('HOME'), 'Multi-Robot-Nav/robots', 'porthos']),
             'world': LaunchConfiguration('world'),
             'rviz': LaunchConfiguration('rviz'),
             'x': '3.0',
@@ -78,68 +77,18 @@ def generate_launch_description() -> LaunchDescription:
         }.items()
     )
 
-    robot1_tf_relay = Node(
-        package='utils',
-        executable='tf_prefix_relay',
-        name='tf_prefix_relay_aramis',
-        parameters=[{'robot_ns': 'aramis'}],
-        output='screen',
-    )
-
-    robot2_tf_relay = Node(
-        package='utils',
-        executable='tf_prefix_relay',
-        name='tf_prefix_relay_athos',
-        parameters=[{'robot_ns': 'athos'}],
-        output='screen',
-    )
-
-    robot3_tf_relay = Node(
-        package='utils',
-        executable='tf_prefix_relay',
-        name='tf_prefix_relay_porthos',
-        parameters=[{'robot_ns': 'porthos'}],
-        output='screen',
-    )
-
-    robot1_velodyne_relay = Node(
-        package='utils',
-        executable='velodyne_relay',
-        name='velodyne_relay_aramis',
-        parameters=[{'robot_ns': 'aramis'}],
-        output='screen',
-    )
-
-    robot2_velodyne_relay = Node(
-        package='utils',
-        executable='velodyne_relay',
-        name='velodyne_relay_athos',
-        parameters=[{'robot_ns': 'athos'}],
-        output='screen',
-    )
-
-    robot3_velodyne_relay = Node(
-        package='utils',
-        executable='velodyne_relay',
-        name='velodyne_relay_porthos',
-        parameters=[{'robot_ns': 'porthos'}],
-        output='screen',
-    )
-
     ld = LaunchDescription(ARGUMENTS)
     if _has_nvidia():
         ld.add_action(SetEnvironmentVariable('__NV_PRIME_RENDER_OFFLOAD', '1'))
         ld.add_action(SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'))
 
     ld.add_action(robot1_spawn)
-    ld.add_action(robot1_tf_relay)
-    ld.add_action(robot1_velodyne_relay)
 
     # Spawn athos after 7 seconds
     ld.add_action(
         TimerAction(
             period=7.0,
-            actions=[robot2_spawn, robot2_tf_relay, robot2_velodyne_relay]
+            actions=[robot2_spawn]
         )
     )
 
@@ -147,7 +96,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(
         TimerAction(
             period=14.0,
-            actions=[robot3_spawn, robot3_tf_relay, robot3_velodyne_relay]
+            actions=[robot3_spawn]
         )
     )
 

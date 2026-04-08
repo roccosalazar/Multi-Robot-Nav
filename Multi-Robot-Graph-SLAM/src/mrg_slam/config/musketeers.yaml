@@ -15,10 +15,21 @@
     # - aramis
     model_namespace: "athos"
 
+    # Use global TF topics so all robots share /tf and /tf_static.
+    # true  -> subscribe/publish TF via /<model_namespace>/tf and /<model_namespace>/tf_static
+    # false -> use global /tf and /tf_static
+    tf_topics_in_model_namespace: false
+
+    # Keep frame ids prefixed (athos/base_link, aramis/odom, ...).
+    # true  -> athos/base_link style
+    # false -> base_link style
+    prefix_frames_with_model_namespace: true
+
     # Must be true in Gazebo simulation.
     use_sim_time: true
 
-    points_topic: "velodyne_points"
+    # Native Clearpath LiDAR topic, avoids additional relay nodes.
+    points_topic: "sensors/lidar3d_0/points"
 
     # IMU topic in your Clearpath setup.
     # At the moment IMU frontend is disabled below, so this is not critical yet,
@@ -51,17 +62,14 @@ lidar2base_publisher:
     child_frame_id: "lidar3d_0_laser"
 
 # ============================================================
-# Transform between global "map" and each robot-local "robot/map"
-# Keep this enabled for multi-robot visualization and map handling.
-# The intent is to have a structure like:
-# map -> athos/map
-# map -> porthos/map
-# map -> aramis/map
+# Transform between global "map" and each robot-local "robot/map".
+# With prefix_frames_with_model_namespace=true this can be enabled if you need
+# a global map-><robot>/map static edge. It is kept disabled here.
 # ============================================================
 
 map2robotmap_publisher:
   ros__parameters:
-    enable_map2robotmap_publisher: true
+    enable_map2robotmap_publisher: false
 
     # Leave zero here.
     # Robot initial pose is handled in mrg_slam_component below
@@ -78,7 +86,7 @@ map2robotmap_publisher:
     frame_id: "map"
 
     # Child map frame.
-    # mrg_slam handles robot-specific map naming internally.
+    # It is prefixed when prefix_frames_with_model_namespace=true.
     child_frame_id: "map"
 
 # ============================================================
@@ -90,9 +98,8 @@ prefiltering_component:
   ros__parameters:
     enable_prefiltering: true
 
-    # In your real observed TF tree the frame is "base_link",
-    # not "athos/base_link".
-    # Keep this exactly as observed for now.
+    # Keep unprefixed here. launch logic applies model namespace prefix when
+    # prefix_frames_with_model_namespace=true.
     base_link_frame: "base_link"
 
     # Downsampling keeps the cloud lighter for scan matching.
@@ -188,7 +195,7 @@ mrg_slam_component:
     enable_mrg_slam: true
 
     # Robot own name.
-    # Keep a placeholder here; overwrite from launch for each robot.
+    # Kept as placeholder; launch overwrites this with model_namespace.
     own_name: "athos"
 
     # All robots participating in the multi-robot system.

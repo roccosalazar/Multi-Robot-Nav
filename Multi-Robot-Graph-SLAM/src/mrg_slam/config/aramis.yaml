@@ -3,9 +3,13 @@
 /**:
   ros__parameters:
     model_namespace: "aramis"
+    # Use global TF topics
+    tf_topics_in_model_namespace: false
+    # Keep frame ids prefixed (aramis/base_link, aramis/odom, ...)
+    prefix_frames_with_model_namespace: true
     use_sim_time: true
-    points_topic: "velodyne_points"
-    imu_topic: "imu/data"
+    points_topic: "sensors/lidar3d_0/points"
+    imu_topic: "sensors/imu_0/data"
 
 lidar2base_publisher:
   ros__parameters:
@@ -17,11 +21,12 @@ lidar2base_publisher:
     pitch: 0.0
     yaw: 0.0
     frame_id: "base_link"
-    child_frame_id: "velodyne"
+    child_frame_id: "lidar3d_0_laser"
 
 map2robotmap_publisher:
   ros__parameters:
-    enable_map2robotmap_publisher: true
+    # Keep disabled in single-robot mode
+    enable_map2robotmap_publisher: false
     x: 0.0
     y: 0.0
     z: 0.0
