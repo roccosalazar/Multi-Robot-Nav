@@ -61,9 +61,11 @@ Makefile
 *.swo
 .DS_Store
 Thumbs.db
+
 # Ignore everything in robots folder
 /robots/*
 
 # But keep robots.yaml files in robot subdirectories
 !/robots/*/
-!/robots/*/robots.yaml
+!/robots/*/robot.yaml
+!/robots/
