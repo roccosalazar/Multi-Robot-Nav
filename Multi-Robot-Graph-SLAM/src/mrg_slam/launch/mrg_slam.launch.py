@@ -12,6 +12,8 @@ from launch_ros.descriptions import ComposableNode
 # The parameters defined in the PARAM_MAPPING can be provided as cli arguments to overwrite the values from the yaml file.
 PARAM_MAPPING = {
     'model_namespace': str,
+    'tf_topics_in_model_namespace': bool,
+    'prefix_frames_with_model_namespace': bool,
     'use_sim_time': bool,
     'enable_prefiltering': bool,
     'enable_scan_matching_odometry': bool,
@@ -102,6 +104,13 @@ def launch_setup(context, *args, **kwargs):
     mrg_slam_params = overwrite_yaml_params_from_cli(mrg_slam_params, context.launch_configurations)
 
     model_namespace = shared_params['model_namespace']
+    tf_topics_in_model_namespace = shared_params.get('tf_topics_in_model_namespace', False)
+    prefix_frames_with_model_namespace = shared_params.get('prefix_frames_with_model_namespace', True)
+
+    def maybe_prefix_frame(frame_id):
+        if model_namespace != '' and prefix_frames_with_model_namespace:
+            return model_namespace + '/' + frame_id
+        return frame_id
 
     print_yaml_params(shared_params, 'shared_params')
     print_yaml_params(lidar2base_publisher_params, 'lidar2base_publisher_params')
@@ -112,16 +121,15 @@ def launch_setup(context, *args, **kwargs):
     print_yaml_params(mrg_slam_params, 'mrg_slam_params')
 
     # Use remapped tf topics to avoid conflicts in multi robot case, if necessary
-    tf_remappings = []  # [('/tf', 'tf'), ('/tf_static', 'tf_static')]
+    tf_remappings = []
+    if tf_topics_in_model_namespace:
+        tf_remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
     print_remappings(tf_remappings, 'tf_remappings')
 
     # Create the static transform publisher node between the base and the lidar frame
     if lidar2base_publisher_params['enable_lidar2base_publisher']:
-        frame_id = lidar2base_publisher_params['frame_id']
-        child_frame_id = lidar2base_publisher_params['child_frame_id']
-        if model_namespace != '':
-            frame_id = model_namespace + '/' + frame_id
-            child_frame_id = model_namespace + '/' + child_frame_id
+        frame_id = maybe_prefix_frame(lidar2base_publisher_params['frame_id'])
+        child_frame_id = maybe_prefix_frame(lidar2base_publisher_params['child_frame_id'])
         static_transform_publisher = Node(
             name='lidar2base_publisher',
             namespace=model_namespace,
@@ -151,9 +159,21 @@ def launch_setup(context, *args, **kwargs):
             remappings=tf_remappings,
         )
 
+    enable_map2robotmap_publisher = (
+        map2robotmap_publisher_params['enable_map2robotmap_publisher']
+        and model_namespace != ''
+        and prefix_frames_with_model_namespace
+    )
+    if (
+        map2robotmap_publisher_params['enable_map2robotmap_publisher']
+        and model_namespace != ''
+        and not prefix_frames_with_model_namespace
+    ):
+        print('Disabled map2robotmap_publisher because prefix_frames_with_model_namespace=false would create an invalid map->map transform.')
+
     # Create the map2robotmap publisher node, if it is enabled and a model_namespace is set
-    if map2robotmap_publisher_params['enable_map2robotmap_publisher'] and model_namespace != '':
-        map2robotmap_child_frame_id = model_namespace + '/' + map2robotmap_publisher_params['child_frame_id']
+    if enable_map2robotmap_publisher:
+        map2robotmap_child_frame_id = maybe_prefix_frame(map2robotmap_publisher_params['child_frame_id'])
         map2robotmap_publisher = Node(
             name='map2robotmap_publisher',
             namespace=model_namespace,
@@ -223,7 +243,7 @@ def launch_setup(context, *args, **kwargs):
     # Create the composable nodes, change names, topics, remappings to avoid conflicts for the multi robot case
 
     # prefiltering component
-    if model_namespace != '':
+    if model_namespace != '' and prefix_frames_with_model_namespace:
         prefiltering_params['base_link_frame'] = model_namespace + '/' + prefiltering_params['base_link_frame']
     if prefiltering_params['enable_prefiltering']:
         prefiltering_node = ComposableNode(
@@ -233,17 +253,18 @@ def launch_setup(context, *args, **kwargs):
             namespace=model_namespace,
             parameters=[prefiltering_params, shared_params],
             extra_arguments=[{'use_intra_process_comms': True}],
-            remappings=[('imu/data', shared_params['imu_topic']), ('velodyne_points', shared_params['points_topic'])],
+            remappings=tf_remappings + [('imu/data', shared_params['imu_topic']), ('velodyne_points', shared_params['points_topic'])],
         )
 
     # scan_matching_odometry component
     # set the correct frame ids according to the model namespace
-    scan_matching_odometry_params['odom_frame_id'] = (
-        model_namespace + '/' + scan_matching_odometry_params['odom_frame_id']
-    )
-    scan_matching_odometry_params['robot_odom_frame_id'] = (
-        model_namespace + '/' + scan_matching_odometry_params['robot_odom_frame_id']
-    )
+    if model_namespace != '' and prefix_frames_with_model_namespace:
+        scan_matching_odometry_params['odom_frame_id'] = (
+            model_namespace + '/' + scan_matching_odometry_params['odom_frame_id']
+        )
+        scan_matching_odometry_params['robot_odom_frame_id'] = (
+            model_namespace + '/' + scan_matching_odometry_params['robot_odom_frame_id']
+        )
     if scan_matching_odometry_params['enable_scan_matching_odometry']:
         scan_matching_odometry_node = ComposableNode(
             package='mrg_slam',
@@ -279,11 +300,13 @@ def launch_setup(context, *args, **kwargs):
             namespace=model_namespace,
             parameters=[floor_detection_params, shared_params],
             extra_arguments=[{'use_intra_process_comms': True}],
+            remappings=tf_remappings,
         )
 
     # mrg_slam component
     if mrg_slam_params['enable_mrg_slam']:
-        mrg_slam_params['own_name'] = model_namespace
+        if model_namespace != '':
+            mrg_slam_params['own_name'] = model_namespace
         # Overwrite init_pose array with the actual values
         mrg_slam_params['init_pose'][0] = mrg_slam_params['x']
         mrg_slam_params['init_pose'][1] = mrg_slam_params['y']
@@ -292,7 +315,7 @@ def launch_setup(context, *args, **kwargs):
         mrg_slam_params['init_pose'][4] = mrg_slam_params['pitch']
         mrg_slam_params['init_pose'][5] = mrg_slam_params['yaw']
         # set the correct frame ids according to the model namespace
-        if model_namespace != '':
+        if model_namespace != '' and prefix_frames_with_model_namespace:
             mrg_slam_params['map_frame_id'] = model_namespace + '/' + mrg_slam_params['map_frame_id']
             mrg_slam_params['odom_frame_id'] = model_namespace + '/' + mrg_slam_params['odom_frame_id']
         mrg_slam_node = ComposableNode(
@@ -302,7 +325,7 @@ def launch_setup(context, *args, **kwargs):
             namespace=model_namespace,
             parameters=[mrg_slam_params, shared_params],
             extra_arguments=[{'use_intra_process_comms': True}],
-            remappings=[('imu/data', shared_params['imu_topic'])],
+            remappings=tf_remappings + [('imu/data', shared_params['imu_topic'])],
         )
 
     composable_nodes = []
@@ -323,7 +346,7 @@ def launch_setup(context, *args, **kwargs):
     launch_description_list = []
     if lidar2base_publisher_params['enable_lidar2base_publisher']:
         launch_description_list.append(static_transform_publisher)
-    if map2robotmap_publisher_params['enable_map2robotmap_publisher'] and model_namespace != '':
+    if enable_map2robotmap_publisher:
         launch_description_list.append(map2robotmap_publisher)
     launch_description_list.append(map2odom_publisher_ros2)
     launch_description_list.append(container)

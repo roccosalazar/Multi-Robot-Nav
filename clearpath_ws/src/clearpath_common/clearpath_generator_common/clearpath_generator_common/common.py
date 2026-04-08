@@ -122,8 +122,8 @@ class LaunchFile():
                 '--child-frame-id', child_link
             ],
             remappings=[
-                ('/tf', 'tf'),
-                ('/tf_static', 'tf_static'),
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
             ]
         )
 

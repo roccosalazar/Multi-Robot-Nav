@@ -2,7 +2,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import (Command, FindExecutable,
-                                  PathJoinSubstitution, LaunchConfiguration)
+                                  PathJoinSubstitution, LaunchConfiguration,
+                                  PythonExpression)
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -13,6 +14,9 @@ def generate_launch_description():
     robot_description_command = LaunchConfiguration('robot_description_command')
     use_sim_time = LaunchConfiguration('use_sim_time')
     namespace = LaunchConfiguration('namespace')
+    frame_prefix = PythonExpression([
+        "'", namespace, "'.strip('/') + ('/' if '", namespace, "'.strip('/') else '')"
+    ])
     use_fake_hardware = LaunchConfiguration('use_fake_hardware')
     use_manipulation_controllers = LaunchConfiguration('use_manipulation_controllers')
     use_platform_controllers = LaunchConfiguration('use_platform_controllers')
@@ -101,10 +105,11 @@ def generate_launch_description():
             parameters=[{
                 'robot_description': robot_description_content,
                 'use_sim_time': use_sim_time,
+                'frame_prefix': frame_prefix,
             }],
             remappings=[
-                ('/tf', 'tf'),
-                ('/tf_static', 'tf_static'),
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
                 ('joint_states', 'platform/joint_states')]
         ),
     ])

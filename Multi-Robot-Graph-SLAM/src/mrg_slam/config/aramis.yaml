@@ -26,7 +26,7 @@ lidar2base_publisher:
 map2robotmap_publisher:
   ros__parameters:
     # Keep disabled in single-robot mode
-    enable_map2robotmap_publisher: false
+    enable_map2robotmap_publisher: true
     x: 0.0
     y: 0.0
     z: 0.0

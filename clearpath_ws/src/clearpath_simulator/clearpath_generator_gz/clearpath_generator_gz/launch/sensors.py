@@ -79,7 +79,7 @@ class SensorLaunch():
         self.static_tf_node = LaunchFile.get_static_tf_node(
             name=self.name,
             namespace=self._robot_namespace,
-            parent_link=self.name + '_link',
+            parent_link=(self._robot_namespace + '/' + self.name + '_link') if self._robot_namespace not in ('', '/') else (self.name + '_link'),
             child_link=self.robot_name + '/base_link/' + self.name,
             use_sim_time=True
         )

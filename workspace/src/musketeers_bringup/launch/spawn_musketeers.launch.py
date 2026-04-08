@@ -12,7 +12,7 @@ ARGUMENTS = [
     DeclareLaunchArgument('rviz', default_value='false', choices=['true', 'false'], description='Start rviz.'),
     DeclareLaunchArgument('world', default_value='warehouse', description='Gazebo World'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='use_sim_time'),
-    DeclareLaunchArgument('generate', default_value='true', choices=['true', 'false'], description='Generate parameters and launch files'),
+    DeclareLaunchArgument('generate', default_value='false', choices=['true', 'false'], description='Generate parameters and launch files'),
 ]
 
 

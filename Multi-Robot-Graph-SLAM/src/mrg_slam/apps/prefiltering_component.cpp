@@ -128,15 +128,38 @@ private:
         std::string base_link_frame = get_parameter( "base_link_frame" ).as_string();
         if( !base_link_frame.empty() ) {
             geometry_msgs::msg::TransformStamped transform;
+            const std::string                    original_source_frame = src_cloud->header.frame_id;
+            std::string                          source_frame          = original_source_frame;
             try {
                 // lookupTransform contains a Duration as parameter
-                transform = tf_buffer_->lookupTransform( base_link_frame, src_cloud->header.frame_id, rclcpp::Time( 0 ),
+                transform = tf_buffer_->lookupTransform( base_link_frame, source_frame, rclcpp::Time( 0 ),
                                                          rclcpp::Duration( 2, 0 ) );
             } catch( const tf2::TransformException& ex ) {
-                RCLCPP_WARN( get_logger(), "Could not transform source frame %s to target frame %s: %s", src_cloud->header.frame_id.c_str(),
-                             base_link_frame.c_str(), ex.what() );
-                RCLCPP_WARN( get_logger(), "Returning early in cloud_callback from prefiltering component" );
-                return;
+                // In some simulator setups PointCloud2 still carries an unprefixed frame_id
+                // (e.g. lidar3d_0_laser) while TF is namespace-prefixed (e.g. aramis/lidar3d_0_laser).
+                // Try a second lookup by prepending the namespace inferred from base_link_frame.
+                bool fallback_succeeded = false;
+
+                const auto ns_end = base_link_frame.rfind( '/' );
+                if( ns_end != std::string::npos && source_frame.find( '/' ) == std::string::npos ) {
+                    const std::string frame_prefix        = base_link_frame.substr( 0, ns_end );
+                    const std::string prefixed_source     = frame_prefix + "/" + source_frame;
+
+                    try {
+                        transform = tf_buffer_->lookupTransform( base_link_frame, prefixed_source, rclcpp::Time( 0 ),
+                                                                 rclcpp::Duration( 2, 0 ) );
+                        source_frame      = prefixed_source;
+                        fallback_succeeded = true;
+                    } catch( const tf2::TransformException& ) {
+                    }
+                }
+
+                if( !fallback_succeeded ) {
+                    RCLCPP_WARN( get_logger(), "Could not transform source frame %s to target frame %s: %s", original_source_frame.c_str(),
+                                 base_link_frame.c_str(), ex.what() );
+                    RCLCPP_WARN( get_logger(), "Returning early in cloud_callback from prefiltering component" );
+                    return;
+                }
             }
 
             pcl::PointCloud<PointT>::Ptr transformed( new pcl::PointCloud<PointT>() );

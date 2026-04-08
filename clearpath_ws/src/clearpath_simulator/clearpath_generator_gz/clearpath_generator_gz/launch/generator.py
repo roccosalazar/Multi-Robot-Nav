@@ -102,7 +102,7 @@ class GzLaunchGenerator(LaunchGenerator):
                 '/model/' + self.robot_name + '/tf' + self.GZ_TO_ROS_TF
             ],
             remappings=[
-                ('/model/' + self.robot_name + '/tf', 'tf')
+                ('/model/' + self.robot_name + '/tf', '/tf')
             ])
 
         # Builtin IMU bridge
@@ -135,7 +135,7 @@ class GzLaunchGenerator(LaunchGenerator):
               ('imu/data_raw', 'sensors/imu_0/data_raw'),
               ('imu/mag', 'sensors/imu_0/magnetic_field'),
               ('imu/data', 'sensors/imu_0/data'),
-              ('/tf', 'tf'),
+                            ('/tf', '/tf'),
             ],
         )
 
@@ -207,7 +207,6 @@ class GzLaunchGenerator(LaunchGenerator):
             ],
             Platform.W200: [
                 self.cmd_vel_node,
-                self.odom_base_node,
                 self.imu_0_bridge_node,
                 self.imu_filter_arg,
                 self.imu_filter_node,

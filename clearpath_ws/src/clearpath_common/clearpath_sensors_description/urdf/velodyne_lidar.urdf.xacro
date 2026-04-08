@@ -5,6 +5,9 @@
                                              ang_res_h:=0.4 min_ang_h:=-3.141592 max_ang_h:=3.141592
                                              ang_res_v:=2.0 min_ang_v:=-0.261799 max_ang_v:=0.261799
                                              update_rate:=20 min_range:=0.9 max_range:=130.0">
+    <xacro:property name="robot_ns" value="$(arg namespace)"/>
+    <xacro:property name="frame_prefix" value="${robot_ns + '/' if robot_ns != '' else ''}"/>
+
     <link name="${name}_link">
       <inertial>
         <mass value="0.83"/>
@@ -68,7 +71,7 @@
         <update_rate>${update_rate}</update_rate>
         <visualize>true</visualize>
         <always_on>true</always_on>
-        <ignition_frame_id>${name}_laser</ignition_frame_id>
+        <ignition_frame_id>${frame_prefix}${name}_laser</ignition_frame_id>
         <topic>$(arg namespace)/sensors/${name}/scan</topic>
         <lidar>
           <scan>

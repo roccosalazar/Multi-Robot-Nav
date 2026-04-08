@@ -84,8 +84,8 @@ def generate_launch_description():
         remappings=[
             ('odometry/filtered', 'platform/odom/filtered'),
             ('/diagnostics', 'diagnostics'),
-            ('/tf', 'tf'),
-            ('/tf_static', 'tf_static'),
+            ('/tf', '/tf'),
+            ('/tf_static', '/tf_static'),
         ],
         condition=IfCondition(enable_ekf),
     )

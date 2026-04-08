@@ -8,6 +8,12 @@ system:
     namespace: aramis
 platform:
   wheel: track
+  extras:
+    ros_parameters:
+      platform_velocity_controller:
+        enable_odom_tf: false
+      ekf_node:
+        publish_tf: false
 links:
   box:
     - name: structure

@@ -80,8 +80,8 @@ def launch_setup(context, *args, **kwargs):
                 {'use_sim_time': use_sim_time},
             ],
             remappings=[
-                ('/tf', 'tf'),
-                ('/tf_static', 'tf_static'),
+                ('/tf', '/tf'),
+                ('/tf_static', '/tf_static'),
                 ('joint_states', 'platform/joint_states'),
             ]
         )

@@ -76,8 +76,8 @@ def generate_launch_description():
             {'use_sim_time': use_sim_time}],
         remappings=[
             ('/diagnostics', 'diagnostics'),
-            ('/tf', 'tf'),
-            ('/tf_static', 'tf_static'),
+            ('/tf', '/tf'),
+            ('/tf_static', '/tf_static'),
             ('joy', 'joy_teleop/joy'),
             ('joy/set_feedback', 'joy_teleop/joy/set_feedback'),
         ]

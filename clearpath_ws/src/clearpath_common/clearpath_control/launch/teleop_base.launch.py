@@ -92,8 +92,8 @@ def generate_launch_description():
         remappings={
             ('cmd_vel_out', 'platform/cmd_vel_unstamped'),
             ('/diagnostics', 'diagnostics'),
-            ('/tf', 'tf'),
-            ('/tf_static', 'tf_static'),
+            ('/tf', '/tf'),
+            ('/tf_static', '/tf_static'),
         },
         parameters=[
             config_twist_mux,

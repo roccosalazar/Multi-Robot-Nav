@@ -46,8 +46,8 @@ REMAPPINGS = [
     ('platform_velocity_controller/cmd_vel_unstamped', 'platform/cmd_vel_unstamped'),
     ('platform_velocity_controller/reference', 'platform/cmd_vel_unstamped'),
     ('/diagnostics', 'diagnostics'),
-    ('/tf', 'tf'),
-    ('/tf_static', 'tf_static'),
+    ('/tf', '/tf'),
+    ('/tf_static', '/tf_static'),
     ('~/robot_description', 'robot_description'),
 ]
 
