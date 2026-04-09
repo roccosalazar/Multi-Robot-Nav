@@ -46,6 +46,7 @@ def generate_launch_description() -> LaunchDescription:
                 'input_topic': 'ground_truth/pose_raw',
                 'output_topic': 'ground_truth/pose',
                 'target_entity_name': [LaunchConfiguration('robot_name'), '/robot'],
+                'output_frame_id': LaunchConfiguration('world'),
             }
         ],
     )

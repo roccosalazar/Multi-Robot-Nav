@@ -17,19 +17,24 @@ class GroundTruthPoseExtractor(Node):
         self.declare_parameter('input_topic', 'ground_truth/pose_raw')
         self.declare_parameter('output_topic', 'ground_truth/pose')
         self.declare_parameter('target_entity_name', '')
+        self.declare_parameter('output_frame_id', '')
 
         input_topic = self.get_parameter('input_topic').get_parameter_value().string_value
         output_topic = self.get_parameter('output_topic').get_parameter_value().string_value
         configured_target = self.get_parameter('target_entity_name').get_parameter_value().string_value.strip()
+        configured_output_frame = self.get_parameter('output_frame_id').get_parameter_value().string_value.strip()
 
         self.target_entity_name = configured_target or self._default_target_name_from_namespace()
+        self.output_frame_id = configured_output_frame
+        self._warned_zero_stamp = False
+        self._warned_empty_frame = False
 
         self.pose_pub = self.create_publisher(PoseStamped, output_topic, 10)
         self.pose_sub = self.create_subscription(TFMessage, input_topic, self._pose_callback, 10)
 
         self.get_logger().info(
             f"Ground truth extractor ready. input='{input_topic}', output='{output_topic}', "
-            f"target_entity='{self.target_entity_name}'"
+            f"target_entity='{self.target_entity_name}', output_frame_id='{self.output_frame_id or 'world'}'"
         )
 
     def _default_target_name_from_namespace(self) -> str:
@@ -54,6 +59,23 @@ class GroundTruthPoseExtractor(Node):
             pose_msg.pose.position.y = transform.transform.translation.y
             pose_msg.pose.position.z = transform.transform.translation.z
             pose_msg.pose.orientation = transform.transform.rotation
+
+            if pose_msg.header.stamp.sec == 0 and pose_msg.header.stamp.nanosec == 0:
+                pose_msg.header.stamp = self.get_clock().now().to_msg()
+                if not self._warned_zero_stamp:
+                    self.get_logger().warn(
+                        'Incoming transform stamp is zero. Using current ROS clock for PoseStamped header stamp.'
+                    )
+                    self._warned_zero_stamp = True
+
+            if not pose_msg.header.frame_id:
+                pose_msg.header.frame_id = self.output_frame_id or 'world'
+                if not self._warned_empty_frame:
+                    self.get_logger().warn(
+                        f"Incoming transform frame_id is empty. Using '{pose_msg.header.frame_id}' for PoseStamped header frame_id."
+                    )
+                    self._warned_empty_frame = True
+
             return pose_msg
 
         return None
