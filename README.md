@@ -220,7 +220,7 @@ Launch files:
 	  - `/world/<world>/dynamic_pose/info`
 	  - to namespaced `ground_truth/pose_raw`.
 	- Starts `ground_truth_pose_extractor`.
-	- Default world argument is `pipeline`.
+	- Default world argument is `warehouse`.
 
 2. `slam_pose_publisher.launch.py`
 	- Starts only `slam_pose_publisher` node with configurable frames/rate.
@@ -336,7 +336,8 @@ ros2 launch musketeers_bringup single_slam_bringup.launch.py \
   robot_name:=aramis \
   config:=aramis.yaml \
   use_sim_time:=true \
-  x:=0.0 y:=0.0 z:=0.0
+	x:=0.0 y:=0.0 z:=0.0 \
+	slam_pose_offset_x:=0.0 slam_pose_offset_y:=0.0 slam_pose_offset_z:=0.35
 ```
 
 For multi-robot SLAM experiments, launch one SLAM instance per robot namespace.
@@ -345,7 +346,5 @@ For multi-robot SLAM experiments, launch one SLAM instance per robot namespace.
 
 - `spawn_robot.launch.py` defaults `generate:=false`, so it expects robot-specific generated files to already exist under `robots/<name>/...`.
 - Generated robot launch files currently contain absolute paths rooted at `/home/ubuntu/Multi-Robot-Nav/...`.
-- World defaults are not uniform:
-  - bringup launches default to `warehouse`,
-  - `ground_truth_pose.launch.py` defaults to `pipeline`.
-  Use explicit `world:=...` arguments to avoid mismatches.
+- World defaults are now aligned to `warehouse` across workspace launch files.
+- For SLAM vs ground-truth pose comparison, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.

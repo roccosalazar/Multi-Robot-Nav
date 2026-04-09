@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 
 ARGUMENTS = [
     DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot namespace.'),
-    DeclareLaunchArgument('world', default_value='pipeline', description='Gazebo world name.'),
+    DeclareLaunchArgument('world', default_value='warehouse', description='Gazebo world name.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
 ]
 
