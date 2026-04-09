@@ -69,7 +69,7 @@ lidar2base_publisher:
 
 map2robotmap_publisher:
   ros__parameters:
-    enable_map2robotmap_publisher: false
+    enable_map2robotmap_publisher: true
 
     # Leave zero here.
     # Robot initial pose is handled in mrg_slam_component below
