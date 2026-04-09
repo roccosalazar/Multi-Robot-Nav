@@ -14,7 +14,7 @@ The current custom logic in this repository is centered on:
 - launching single-robot `mrg_slam` instances in robot namespaces,
 - publishing comparable pose streams for evaluation:
   - ground truth from Gazebo dynamic pose,
-  - SLAM pose from TF (`map -> <robot>/base_link`).
+	- SLAM pose from TF (`map -> <robot>/base_link`) published on `/<robot>/slam/pose` with `header.frame_id=<world>` (default `warehouse`).
 
 ## What The Project Is Building
 
@@ -78,7 +78,7 @@ That is the key handoff from custom bringup to Clearpath-generated robot assets.
 	- `model_namespace` = `robot_name`,
 	- `use_sim_time`,
 	- initial `x/y/z`.
-2. Starts `slam_evaluation/slam_pose_publisher` to publish `/<robot>/slam/pose` from TF.
+2. Starts `slam_evaluation/slam_pose_publisher` to publish `/<robot>/slam/pose` from TF (`map -> <robot>/base_link`) and sets output `header.frame_id` from `world` (default `warehouse`).
 
 Relevant `mrg_slam` config files present in this repository:
 
@@ -183,7 +183,7 @@ Important launch files:
 5. `single_slam_bringup.launch.py`
 	- Includes `mrg_slam.launch.py` for one robot namespace.
 	- Starts `slam_evaluation/slam_pose_publisher` in same namespace.
-	- Publishes `slam/pose` from TF with configurable offset and lookup timeout.
+	- Publishes `slam/pose` from TF lookup (`map -> <namespace>/base_link`) with configurable xyz offset, output frame id (`world`) and lookup timeout.
 	- Category: SLAM bringup + SLAM output normalization for evaluation.
 
 6. `rviz/aramis.rviz`
@@ -211,7 +211,7 @@ Python nodes:
 2. `slam_pose_publisher.py`
 	- Looks up TF transform `map_frame -> target_base_frame` (default `map -> <namespace>/base_link`).
 	- Publishes `PoseStamped` on `slam/pose`.
-	- Supports configurable publish rate, lookup timeout, and xyz offsets.
+	- Supports configurable publish rate, lookup timeout, xyz offsets, and output `frame_id`.
 
 Launch files:
 
@@ -223,7 +223,7 @@ Launch files:
 	- Default world argument is `warehouse`.
 
 2. `slam_pose_publisher.launch.py`
-	- Starts only `slam_pose_publisher` node with configurable frames/rate.
+	- Starts only `slam_pose_publisher` node with configurable lookup frames, output `frame_id`, rate, timeout, and offsets.
 
 ## Launch Connectivity: End-To-End Data Flow
 
@@ -241,7 +241,7 @@ Launch files:
 
 1. `single_slam_bringup.launch.py` launches one `mrg_slam` instance in `/<robot_name>` namespace.
 2. `mrg_slam` consumes Clearpath LiDAR points (`sensors/lidar3d_0/points` per config) and publishes SLAM TF/map outputs.
-3. `slam_pose_publisher` converts SLAM TF to `/<robot_name>/slam/pose`.
+3. `slam_pose_publisher` converts SLAM TF to `/<robot_name>/slam/pose` using TF `map -> <robot>/base_link` and publishes with `header.frame_id=<world>`.
 4. If enabled in `spawn_robot.launch.py`, `ground_truth_pose.launch.py` publishes `/<robot_name>/ground_truth/pose` from Gazebo dynamic pose.
 
 This gives two comparable pose streams per robot:
@@ -336,6 +336,7 @@ ros2 launch musketeers_bringup single_slam_bringup.launch.py \
   robot_name:=aramis \
   config:=aramis.yaml \
   use_sim_time:=true \
+	world:=warehouse \
 	x:=0.0 y:=0.0 z:=0.0 \
 	slam_pose_offset_x:=0.0 slam_pose_offset_y:=0.0 slam_pose_offset_z:=0.35
 ```
@@ -347,4 +348,5 @@ For multi-robot SLAM experiments, launch one SLAM instance per robot namespace.
 - `spawn_robot.launch.py` defaults `generate:=false`, so it expects robot-specific generated files to already exist under `robots/<name>/...`.
 - Generated robot launch files currently contain absolute paths rooted at `/home/ubuntu/Multi-Robot-Nav/...`.
 - World defaults are now aligned to `warehouse` across workspace launch files.
-- For SLAM vs ground-truth pose comparison, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.
+- For SLAM vs ground-truth pose comparison, use the same `world:=...` in both simulation and SLAM bringup, because `single_slam_bringup` sets `/robot/slam/pose.header.frame_id` from `world`.
+- For vertical alignment, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.

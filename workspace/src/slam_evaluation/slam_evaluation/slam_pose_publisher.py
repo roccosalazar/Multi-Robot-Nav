@@ -16,6 +16,7 @@ class SlamPosePublisher(Node):
 
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('base_frame', 'base_link')
+        self.declare_parameter('output_frame_id', 'warehouse')
         self.declare_parameter('output_topic', 'slam/pose')
         self.declare_parameter('publish_rate', 20.0)
         self.declare_parameter('lookup_timeout_sec', 0.1)
@@ -25,6 +26,7 @@ class SlamPosePublisher(Node):
 
         self.map_frame = self.get_parameter('map_frame').get_parameter_value().string_value.strip('/') or 'map'
         self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value.strip('/') or 'base_link'
+        self.output_frame_id = self.get_parameter('output_frame_id').get_parameter_value().string_value.strip('/')
         self.output_topic = self.get_parameter('output_topic').get_parameter_value().string_value
         self.publish_rate = float(self.get_parameter('publish_rate').value)
         self.lookup_timeout_sec = float(self.get_parameter('lookup_timeout_sec').value)
@@ -44,6 +46,7 @@ class SlamPosePublisher(Node):
 
         self.get_logger().info(
             f"SlamPosePublisher started: tf '{self.map_frame}' -> '{self.target_frame}', output '{self.output_topic}', "
+            f"frame_id='{self.output_frame_id or self.map_frame}', "
             f"offset=({self.position_offset_x:.3f}, {self.position_offset_y:.3f}, {self.position_offset_z:.3f})"
         )
 
@@ -79,8 +82,7 @@ class SlamPosePublisher(Node):
         pose_msg.header = transform.header
         if pose_msg.header.stamp.sec == 0 and pose_msg.header.stamp.nanosec == 0:
             pose_msg.header.stamp = self.get_clock().now().to_msg()
-        if not pose_msg.header.frame_id:
-            pose_msg.header.frame_id = self.map_frame
+        pose_msg.header.frame_id = self.output_frame_id or self.map_frame
 
         pose_msg.pose.position.x = transform.transform.translation.x + self.position_offset_x
         pose_msg.pose.position.y = transform.transform.translation.y + self.position_offset_y
