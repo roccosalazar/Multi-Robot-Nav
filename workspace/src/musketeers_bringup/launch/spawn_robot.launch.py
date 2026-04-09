@@ -13,7 +13,7 @@ ARGUMENTS = [
 	DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot name to spawn (e.g. aramis, athos, porthos).'),
 	DeclareLaunchArgument('x', default_value='0.0', description='Initial x position of the robot.'),
 	DeclareLaunchArgument('y', default_value='0.0', description='Initial y position of the robot.'),
-	DeclareLaunchArgument('z', default_value='0.3', description='Initial z position of the robot.'),
+	DeclareLaunchArgument('z', default_value='0.35', description='Initial z position of the robot.'),
 	DeclareLaunchArgument('yaw', default_value='0.0', description='Initial yaw of the robot.'),
 	DeclareLaunchArgument('rviz', default_value='false', choices=['true', 'false'], description='Start rviz.'),
 	DeclareLaunchArgument('world', default_value='warehouse', description='Gazebo World'),

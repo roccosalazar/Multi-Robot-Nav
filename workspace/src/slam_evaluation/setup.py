@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ground_truth_pose_extractor = slam_evaluation.ground_truth_pose_extractor:main',
+            'slam_pose_publisher = slam_evaluation.slam_pose_publisher:main',
         ],
     },
 )

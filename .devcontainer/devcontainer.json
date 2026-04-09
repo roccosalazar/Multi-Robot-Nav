@@ -22,8 +22,8 @@
   "workspaceFolder": "/home/ubuntu/${localWorkspaceFolderBasename}",
   "mounts": [
     "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind",
-    "source=${localWorkspaceFolder}/clearpath,target=/home/ubuntu/clearpath,type=bind" // Bind mount for the clearpath robot
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind"
+    // "source=${localWorkspaceFolder}/clearpath,target=/home/ubuntu/clearpath,type=bind" // Bind mount for the clearpath robot
   ],
   "customizations": {
     "vscode": {
