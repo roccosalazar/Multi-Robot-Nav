@@ -11,7 +11,7 @@ This codebase combines three layers:
 The current custom logic in this repository is centered on:
 
 - launching one/two/three simulated robots with reproducible spawn poses,
-- launching single-robot `mrg_slam` instances in robot namespaces,
+- launching single-robot and multi-robot `mrg_slam` instances in robot namespaces,
 - publishing comparable pose streams for evaluation:
   - ground truth from Gazebo dynamic pose,
 	- SLAM pose from TF (`map -> <robot>/base_link`) published on `/<robot>/slam/pose` with `header.frame_id=<world>` (default `warehouse`).
@@ -69,9 +69,9 @@ That is the key handoff from custom bringup to Clearpath-generated robot assets.
 ## How `mrg_slam` Is Used Here
 
 `mrg_slam` is consumed from `Multi-Robot-Graph-SLAM/src/mrg_slam` and launched by
-`workspace/src/musketeers_bringup/launch/single_slam_bringup.launch.py`.
+`workspace/src/musketeers_bringup/launch/slam_bringup.launch.py`.
 
-`single_slam_bringup.launch.py` does two things for one robot namespace:
+`slam_bringup.launch.py` does two things for one robot namespace:
 
 1. Includes `mrg_slam/launch/mrg_slam.launch.py` with arguments:
 	- `config` (default `aramis.yaml` from `mrg_slam/config`),
@@ -85,7 +85,102 @@ Relevant `mrg_slam` config files present in this repository:
 - `mrg_slam/config/aramis.yaml`: single-robot namespace defaults.
 - `mrg_slam/config/musketeers.yaml`: multi-robot-oriented shared settings (`multi_robot_names: ["athos", "porthos", "aramis"]`).
 
-No custom launch in `workspace` currently starts all three SLAM instances in one command. The existing custom entry point is single-robot SLAM bringup per invocation.
+`multi_slam_bringup.launch.py` starts three SLAM instances (`aramis`, `athos`, `porthos`) in one command. `slam_bringup.launch.py` remains the single-robot entry point.
+
+## Project-Specific Changes To Vendored Upstreams
+
+This repository contains local modifications on top of the imported `clearpath_ws` and `Multi-Robot-Graph-SLAM` sources.
+
+### Version-control layout used in this project
+
+- `clearpath_ws` and `Multi-Robot-Graph-SLAM` are vendored into this monorepo.
+- Nested `.git` directories from the original upstream repositories are not used.
+- All project changes are tracked in the root repository history.
+
+### Changes made in `clearpath_ws`
+
+The local Clearpath stack was modified mainly to normalize TF behavior and improve multi-robot simulation integration.
+
+1. TF remapping normalized to global topics
+	- Multiple launch and generator files were changed from relative remaps (`/tf -> tf`, `/tf_static -> tf_static`) to absolute/global remaps (`/tf -> /tf`, `/tf_static -> /tf_static`).
+	- Modified files include:
+	  - `clearpath_control/launch/control.launch.py`
+	  - `clearpath_control/launch/localization.launch.py`
+	  - `clearpath_control/launch/teleop_base.launch.py`
+	  - `clearpath_control/launch/teleop_joy.launch.py`
+	  - `clearpath_generator_common/common.py`
+	  - `clearpath_platform_description/launch/description.launch.py`
+	  - `clearpath_manipulators_description/launch/description.launch.py`
+	  - `clearpath_platform_description/urdf/generic/gazebo.urdf.xacro`
+
+2. Robot frame prefixing and namespace consistency
+	- `robot_state_publisher` launch paths now compute and pass a `frame_prefix` from the active namespace.
+	- Sensor launch generation was adjusted so generated static TF parent links are namespace-prefixed when needed.
+
+3. Gazebo-to-ROS TF bridge routing changed
+	- In `clearpath_generator_gz/launch/generator.py`, bridge remapping for model TF was changed to publish into global `/tf`.
+	- IMU filter remapping to `/tf` was also normalized.
+
+4. Warthog control TF behavior changed
+	- In `clearpath_control/config/w200/control.yaml`:
+	  - `enable_odom_tf` changed to `true`.
+	  - `tf_frame_prefix_enable` changed to `true`.
+
+5. Generated launch behavior changed for W200
+	- In `clearpath_generator_gz/launch/generator.py`, the W200 launch sequence removed `odom_base_node` from the generated platform action list.
+
+6. Sensor frame naming alignment
+	- In `clearpath_sensors_description/urdf/velodyne_lidar.urdf.xacro`, `ignition_frame_id` is now namespace-aware (`<namespace>/<sensor>_laser` when namespace is set).
+
+7. Simulation world tuning
+	- `clearpath_gz/worlds/pipeline.sdf` and `clearpath_gz/worlds/warehouse.sdf` were locally tuned:
+	  - `max_step_size` changed to `0.01`.
+	  - DART collision detector set to `bullet`.
+	  - Additional scene/plugin adjustments in `pipeline.sdf`.
+
+8. Repository-level cleanup/artifacts in `clearpath_ws`
+	- `clearpath_ws/dependencies.repos` removed.
+	- Benchmark/report artifact logs added under `clearpath_ws/reports/artifacts/`.
+
+### Changes made in `Multi-Robot-Graph-SLAM`
+
+The local SLAM stack was modified to integrate with the Clearpath topic/frame conventions above.
+
+1. TF topic strategy made configurable in `mrg_slam.launch.py`
+	- Added launch parameter support for:
+	  - `tf_topics_in_model_namespace`
+	  - `prefix_frames_with_model_namespace`
+	- TF remappings are now conditional:
+	  - if `tf_topics_in_model_namespace=true`, nodes use namespaced `tf`/`tf_static`.
+	  - if `false`, nodes use global `/tf` and `/tf_static`.
+
+2. Frame prefix logic generalized in `mrg_slam.launch.py`
+	- Added `maybe_prefix_frame(...)` handling.
+	- Prefixed frame IDs are now applied conditionally instead of unconditionally.
+	- `map2robotmap_publisher` is guarded to avoid invalid `map -> map` transforms when frame prefixing is disabled.
+
+3. Component remappings aligned with TF strategy
+	- `tf_remappings` are now propagated to prefiltering, floor detection, and SLAM component remaps where needed.
+
+4. Config updates for Clearpath topics and TF policy
+	- In `mrg_slam/config/aramis.yaml`, `mrg_slam/config/mrg_slam.yaml`, and `mrg_slam/config/musketeers.yaml`:
+	  - `tf_topics_in_model_namespace: false`
+	  - `prefix_frames_with_model_namespace: true`
+	  - LiDAR topic switched to `sensors/lidar3d_0/points` for Clearpath integration.
+	  - IMU topic aligned to `sensors/imu_0/data` where applicable.
+	  - Sensor frame naming updated to `lidar3d_0_laser` in robot-specific config.
+
+5. Prefiltering robustness patch
+	- In `mrg_slam/apps/prefiltering_component.cpp`, TF lookup now has a fallback path that prepends namespace to source frame when incoming PointCloud2 frame IDs are unprefixed but TF tree is prefixed.
+
+### Net effect for this project
+
+These local upstream changes support the project architecture in this repository:
+
+- global/shared TF transport (`/tf`, `/tf_static`) across all robots,
+- namespaced frame IDs to keep robot frames distinct,
+- direct consumption of Clearpath sensor topics by `mrg_slam`,
+- more reliable frame resolution in mixed prefixed/unprefixed simulation conditions.
 
 ## Workspace Directory (Complete Guide)
 
@@ -108,9 +203,9 @@ workspace/src/
 │   ├── launch/
 │   │   ├── spawn_world.launch.py
 │   │   ├── spawn_robot.launch.py
-│   │   ├── spawn_aramis_athos.launch.py
 │   │   ├── spawn_musketeers.launch.py
-│   │   └── single_slam_bringup.launch.py
+│   │   ├── slam_bringup.launch.py
+│   │   └── multi_slam_bringup.launch.py
 │   └── rviz/
 │       └── aramis.rviz
 └── slam_evaluation/
@@ -141,7 +236,7 @@ Purpose:
 
 - launch orchestration for world and robot spawning,
 - staged multi-robot spawn scenarios,
-- single-robot SLAM startup wrapper.
+- single-robot and multi-robot SLAM startup wrappers.
 
 Dependencies (from `package.xml`):
 
@@ -165,14 +260,7 @@ Important launch files:
 	- Optionally includes `slam_evaluation/launch/ground_truth_pose.launch.py` (`ground_truth_pose:=true` by default).
 	- Category: robot bringup + simulation bridge + optional evaluation input.
 
-3. `spawn_aramis_athos.launch.py`
-	- Spawns `aramis`, then `athos` after 7 seconds.
-	- Fixed poses:
-	  - aramis: `(-3.0, 0.0, 0.3, yaw 0.0)`
-	  - athos: `(0.0, 0.0, 0.3, yaw 0.0)`
-	- Category: multi-robot simulation orchestration.
-
-4. `spawn_musketeers.launch.py`
+3. `spawn_musketeers.launch.py`
 	- Spawns `aramis`, `athos`, `porthos` with delays.
 	- Fixed poses:
 	  - aramis: `(-3.0, 0.0, 0.3, yaw 0.0)`
@@ -180,11 +268,19 @@ Important launch files:
 	  - porthos: `(3.0, 0.0, 0.3, yaw 0.0)` after 14 s
 	- Category: multi-robot simulation orchestration.
 
-5. `single_slam_bringup.launch.py`
+4. `slam_bringup.launch.py`
 	- Includes `mrg_slam.launch.py` for one robot namespace.
 	- Starts `slam_evaluation/slam_pose_publisher` in same namespace.
 	- Publishes `slam/pose` from TF lookup (`map -> <namespace>/base_link`) with configurable xyz offset, output frame id (`world`) and lookup timeout.
 	- Category: SLAM bringup + SLAM output normalization for evaluation.
+
+5. `multi_slam_bringup.launch.py`
+	- Includes `slam_bringup.launch.py` three times for `aramis`, `athos`, `porthos`.
+	- Defaults to `config:=musketeers.yaml` and robot initial poses:
+	  - aramis: `x:=-3.0 y:=0.0 z:=0.0`
+	  - athos: `x:=0.0 y:=0.0 z:=0.0`
+	  - porthos: `x:=3.0 y:=0.0 z:=0.0`
+	- Category: multi-robot SLAM bringup + SLAM output normalization for evaluation.
 
 6. `rviz/aramis.rviz`
 	- RViz profile configured for namespaced topics such as `/aramis/mrg_slam/map_points`, `/aramis/mrg_slam/markers`, and `/aramis/scan_matching_odometry/odom`.
@@ -239,7 +335,7 @@ Launch files:
 
 ### SLAM and evaluation
 
-1. `single_slam_bringup.launch.py` launches one `mrg_slam` instance in `/<robot_name>` namespace.
+1. `slam_bringup.launch.py` launches one `mrg_slam` instance in `/<robot_name>` namespace.
 2. `mrg_slam` consumes Clearpath LiDAR points (`sensors/lidar3d_0/points` per config) and publishes SLAM TF/map outputs.
 3. `slam_pose_publisher` converts SLAM TF to `/<robot_name>/slam/pose` using TF `map -> <robot>/base_link` and publishes with `header.frame_id=<world>`.
 4. If enabled in `spawn_robot.launch.py`, `ground_truth_pose.launch.py` publishes `/<robot_name>/ground_truth/pose` from Gazebo dynamic pose.
@@ -258,7 +354,7 @@ This gives two comparable pose streams per robot:
 
 - SLAM-related:
   - `mrg_slam` package and configs in `Multi-Robot-Graph-SLAM/src/mrg_slam`,
-  - `single_slam_bringup.launch.py`,
+	- `slam_bringup.launch.py` and `multi_slam_bringup.launch.py`,
   - `slam_evaluation` nodes and launch files.
 
 - Navigation-related (current state):
@@ -332,7 +428,7 @@ ros2 launch musketeers_bringup spawn_musketeers.launch.py world:=warehouse
 ### D) Single robot SLAM instance
 
 ```bash
-ros2 launch musketeers_bringup single_slam_bringup.launch.py \
+ros2 launch musketeers_bringup slam_bringup.launch.py \
   robot_name:=aramis \
   config:=aramis.yaml \
   use_sim_time:=true \
@@ -341,12 +437,20 @@ ros2 launch musketeers_bringup single_slam_bringup.launch.py \
 	slam_pose_offset_x:=0.0 slam_pose_offset_y:=0.0 slam_pose_offset_z:=0.35
 ```
 
-For multi-robot SLAM experiments, launch one SLAM instance per robot namespace.
+### E) Three-robot SLAM bringup
+
+```bash
+ros2 launch musketeers_bringup multi_slam_bringup.launch.py \
+	use_sim_time:=true \
+	world:=warehouse
+```
+
+`multi_slam_bringup.launch.py` defaults to `config:=musketeers.yaml`.
 
 ## Practical Notes
 
 - `spawn_robot.launch.py` defaults `generate:=false`, so it expects robot-specific generated files to already exist under `robots/<name>/...`.
 - Generated robot launch files currently contain absolute paths rooted at `/home/ubuntu/Multi-Robot-Nav/...`.
 - World defaults are now aligned to `warehouse` across workspace launch files.
-- For SLAM vs ground-truth pose comparison, use the same `world:=...` in both simulation and SLAM bringup, because `single_slam_bringup` sets `/robot/slam/pose.header.frame_id` from `world`.
+- For SLAM vs ground-truth pose comparison, use the same `world:=...` in both simulation and SLAM bringup, because `slam_bringup` sets `/robot/slam/pose.header.frame_id` from `world`.
 - For vertical alignment, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.
