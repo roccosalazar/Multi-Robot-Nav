@@ -1,0 +1,41 @@
+{
+  "name": "Humble Desktop-Full (Intel AMD64)",
+  "dockerFile": "../Dockerfile.amd64",
+  "remoteUser": "ubuntu",
+  "runArgs": [
+    "--privileged",
+    "--network=host",
+    "--ipc=host",
+    "--device=/dev/dri",
+    "--group-add=992",
+    "--group-add=44",
+    "-it"
+  ],
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "QT_X11_NO_MITSHM": "1",
+    "ALSOFT_DRIVERS": "null",
+    "ROS_DOMAIN_ID": "0",
+    "ROS_LOCALHOST_ONLY": "0"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/ubuntu/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/home/ubuntu/${localWorkspaceFolderBasename}",
+  "mounts": [
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-python.python",
+        "ranch-hand-robotics.rde-ros-2",
+        "ranch-hand-robotics.rde-pack",
+        "ranch-hand-robotics.urdf-editor",
+        "github.copilot-chat"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo mkdir -p /tmp/runtime-ubuntu && sudo chmod 700 /tmp/runtime-ubuntu && sudo chown ubuntu:ubuntu /tmp/runtime-ubuntu"
+}
