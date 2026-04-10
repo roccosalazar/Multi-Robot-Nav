@@ -1,5 +1,5 @@
 {
-  "name": "Humble Desktop-Full (Intel AMD64)",
+  "name": "Humble Desktop-Full (Generic AMD64)",
   "dockerFile": "../Dockerfile.amd64",
   "remoteUser": "ubuntu",
   "runArgs": [
