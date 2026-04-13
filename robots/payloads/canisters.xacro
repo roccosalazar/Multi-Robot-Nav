@@ -30,6 +30,12 @@
   </material>
 
   <link name="base_plate">
+    <inertial>
+      <origin xyz="-0.006 0 0.0005" rpy="0 0 0"/>
+      <mass value="14.0"/>
+      <inertia ixx="0.430" ixy="0.0" ixz="0.0" iyy="0.760" iyz="0.0" izz="1.160"/>
+    </inertial>
+
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -69,6 +75,34 @@
       </geometry>
       <material name="mat_mid_detail"/>
     </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.80 0.60 0.025"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.02 0.24 -0.020" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.70 0.05 0.030"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.02 -0.24 -0.020" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.70 0.05 0.030"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.24 0 0.0175" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.50 0.006"/>
+      </geometry>
+    </collision>
   </link>
 
   <joint name="payload_mount_joint" type="fixed">
@@ -84,6 +118,12 @@
   </joint>
 
   <link name="lidar_tower">
+    <inertial>
+      <origin xyz="0 0 0.248" rpy="0 0 0"/>
+      <mass value="4.2"/>
+      <inertia ixx="0.089" ixy="0.0" ixz="0.0" iyy="0.089" iyz="0.0" izz="0.0048"/>
+    </inertial>
+
     <visual>
       <origin xyz="0 0 0.015" rpy="0 0 0"/>
       <geometry>
@@ -123,6 +163,41 @@
       </geometry>
       <material name="mat_canister_cap"/>
     </visual>
+
+    <collision>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.03" radius="0.06"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.04" radius="0.035"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0 0.31" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.50" radius="0.022"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0 0.45" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.03" radius="0.035"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0 0.56" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.01" radius="0.060"/>
+      </geometry>
+    </collision>
   </link>
 
   <joint name="lidar_tower_joint" type="fixed">
@@ -131,7 +206,13 @@
     <origin xyz="0 0 0.0125" rpy="0 0 0"/>
   </joint>
 
-  <link name="turret_lidar_mount"/>
+  <link name="turret_lidar_mount">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.05"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+    </inertial>
+  </link>
 
   <joint name="turret_lidar_mount_joint" type="fixed">
     <parent link="lidar_tower"/>
@@ -140,6 +221,12 @@
   </joint>
 
   <link name="payload_base_link">
+    <inertial>
+      <origin xyz="0.005 0 0.066" rpy="0 0 0"/>
+      <mass value="26.0"/>
+      <inertia ixx="0.640" ixy="0.0" ixz="0.0" iyy="0.150" iyz="0.0" izz="0.690"/>
+    </inertial>
+
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -151,17 +238,17 @@
     <visual>
       <origin xyz="0 -0.19 0.07" rpy="1.5708 0 0"/>
       <geometry>
-        <cylinder length="0.20" radius="0.10"/>
+        <cylinder length="0.19" radius="0.10"/>
       </geometry>
-      <material name="mat_base"/>
+      <material name="mat_soft_panel"/>
     </visual>
 
     <visual>
       <origin xyz="0 0.19 0.07" rpy="1.5708 0 0"/>
       <geometry>
-        <cylinder length="0.20" radius="0.10"/>
+        <cylinder length="0.19" radius="0.10"/>
       </geometry>
-      <material name="mat_base"/>
+      <material name="mat_soft_panel"/>
     </visual>
 
     <visual>
@@ -235,15 +322,98 @@
       </geometry>
       <material name="mat_dark_detail"/>
     </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.20 0.58 0.10"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 -0.19 0.07" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.20" radius="0.10"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0.19 0.07" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.20" radius="0.10"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.055 0 0.040" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.52 0.06"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.055 0 0.040" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.52 0.06"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.035 0.19 0.105" rpy="0 0.45 0"/>
+      <geometry>
+        <box size="0.10 0.06 0.05"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.035 -0.19 0.105" rpy="0 0.45 0"/>
+      <geometry>
+        <box size="0.10 0.06 0.05"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.045 0.19 0.102" rpy="0 -0.35 0"/>
+      <geometry>
+        <box size="0.09 0.06 0.045"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.045 -0.19 0.102" rpy="0 -0.35 0"/>
+      <geometry>
+        <box size="0.09 0.06 0.045"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.07 0 0.095" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.40 0.02"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.085 0 0.070" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.02 0.36 0.05"/>
+      </geometry>
+    </collision>
   </link>
 
   <link name="left_canister_link">
+    <inertial>
+      <origin xyz="0.325 0 0.10" rpy="0 0 0"/>
+      <mass value="21.0"/>
+      <inertia ixx="0.067" ixy="0.0" ixz="0.0" iyy="1.90" iyz="0.0" izz="1.90"/>
+    </inertial>
+
     <visual>
       <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
       <geometry>
         <cylinder length="1.00" radius="0.09"/>
       </geometry>
-      <material name="mat_canister_body"/>
+      <material name="mat_canister_cap"/>
     </visual>
 
     <visual>
@@ -253,15 +423,35 @@
       </geometry>
       <material name="mat_canister_cap"/>
     </visual>
+
+    <collision>
+      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="1.00" radius="0.09"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.10"/>
+      </geometry>
+    </collision>
   </link>
 
   <link name="right_canister_link">
+    <inertial>
+      <origin xyz="0.325 0 0.10" rpy="0 0 0"/>
+      <mass value="21.0"/>
+      <inertia ixx="0.067" ixy="0.0" ixz="0.0" iyy="1.90" iyz="0.0" izz="1.90"/>
+    </inertial>
+
     <visual>
       <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
       <geometry>
         <cylinder length="1.00" radius="0.09"/>
       </geometry>
-      <material name="mat_canister_body"/>
+      <material name="mat_canister_cap"/>
     </visual>
 
     <visual>
@@ -271,6 +461,20 @@
       </geometry>
       <material name="mat_canister_cap"/>
     </visual>
+
+    <collision>
+      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="1.00" radius="0.09"/>
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.10"/>
+      </geometry>
+    </collision>
   </link>
 
   <joint name="left_canister_joint" type="revolute">
