@@ -483,6 +483,7 @@
     <origin xyz="0 0.19 0.05" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
+    <dynamics damping="1.0" friction="0.1"/>
   </joint>
 
   <joint name="right_canister_joint" type="revolute">
@@ -491,6 +492,37 @@
     <origin xyz="0 -0.19 0.05" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
+    <dynamics damping="1.0" friction="0.1"/>
   </joint>
+
+  <gazebo>
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>left_canister_joint</joint_name>
+      <joint_index>0</joint_index>
+      <p_gain>80.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>8.0</d_gain>
+      <i_max>0.0</i_max>
+      <i_min>0.0</i_min>
+      <cmd_max>10.0</cmd_max>
+      <cmd_min>-10.0</cmd_min>
+      <topic>/left_canister/cmd_pos</topic>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-position-controller-system"
+            name="gz::sim::systems::JointPositionController">
+      <joint_name>right_canister_joint</joint_name>
+      <joint_index>0</joint_index>
+      <p_gain>80.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>8.0</d_gain>
+      <i_max>0.0</i_max>
+      <i_min>0.0</i_min>
+      <cmd_max>10.0</cmd_max>
+      <cmd_min>-10.0</cmd_min>
+      <topic>/right_canister/cmd_pos</topic>
+    </plugin>
+  </gazebo>
 
 </robot>
