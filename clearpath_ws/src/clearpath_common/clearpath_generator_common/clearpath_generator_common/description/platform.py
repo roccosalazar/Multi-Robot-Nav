@@ -56,14 +56,18 @@ class PlatformDescription():
         pkg_clearpath_platform_description = 'clearpath_platform_description'
 
         def __init__(self, config: ClearpathConfig) -> None:
+            parameters = {
+                'wheel': config.platform.wheel,
+            }
+            if config.get_platform_model() == Platform.W200:
+                parameters['color'] = config.platform.color
+
             super().__init__(
                 package=self.pkg_clearpath_platform_description,
                 path=f'urdf/{config.get_platform_model()}/',
                 file=config.get_platform_model(),
                 macro=config.get_platform_model(),
-                parameters={
-                    'wheel': config.platform.wheel,
-                }
+                parameters=parameters
             )
 
     class GenericPlatform(BasePlatform):

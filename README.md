@@ -142,6 +142,12 @@ The local Clearpath stack was modified mainly to normalize TF behavior and impro
 	- `clearpath_ws/dependencies.repos` removed.
 	- Benchmark/report artifact logs added under `clearpath_ws/reports/artifacts/`.
 
+9. W200 body color parameter support added
+	- In `clearpath_config/platform/platform.py`, optional `platform.color` was added (default `yellow`).
+	- In `clearpath_generator_common/description/platform.py`, W200 description generation now forwards `color` to the `<xacro:w200 ...>` macro.
+	- This allows selecting body color from each robot setup `robot.yaml` without manually editing generated URDF/Xacro files.
+	- Supported W200 color values are `yellow`, `orange`, `olive`, and `sand`.
+
 ### Changes made in `Multi-Robot-Graph-SLAM`
 
 The local SLAM stack was modified to integrate with the Clearpath topic/frame conventions above.
@@ -452,5 +458,6 @@ ros2 launch musketeers_bringup multi_slam_bringup.launch.py \
 - `spawn_robot.launch.py` defaults `generate:=false`, so it expects robot-specific generated files to already exist under `robots/<name>/...`.
 - Generated robot launch files currently contain absolute paths rooted at `/home/ubuntu/Multi-Robot-Nav/...`.
 - World defaults are now aligned to `warehouse` across workspace launch files.
+- W200 body color can now be configured per robot setup using `platform.color` (for example `olive` to match the IMPACT palette).
 - For SLAM vs ground-truth pose comparison, use the same `world:=...` in both simulation and SLAM bringup, because `slam_bringup` sets `/robot/slam/pose.header.frame_id` from `world`.
 - For vertical alignment, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.

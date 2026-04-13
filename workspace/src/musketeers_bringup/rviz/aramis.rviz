@@ -318,7 +318,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
+        Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /aramis/mrg_slam/map_points
@@ -352,7 +352,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
+        Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /aramis/mrg_slam/map_points_service
@@ -405,7 +405,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
+        Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /aramis/scan_matching_odometry/odom
@@ -413,7 +413,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: aramis/map
     Frame Rate: 30
   Name: root
   Tools:

@@ -65,5 +65,6 @@ Thumbs.db
 # Ignore everything in robots folder
 /robots/**
 !/robots/
-!/robots//
-!/robots//robot.yaml
+!/robots/payloads/
+!/robots/payloads/**
+!/robots/robot.yaml

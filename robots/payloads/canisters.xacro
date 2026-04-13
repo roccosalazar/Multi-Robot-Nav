@@ -1,0 +1,292 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="dual_canister_test">
+
+  <material name="mat_base">
+    <color rgba="0.29 0.29 0.30 1.0"/>
+  </material>
+
+  <material name="mat_canister_body">
+    <color rgba="0.24 0.24 0.25 1.0"/>
+  </material>
+
+  <material name="mat_canister_cap">
+    <color rgba="0.12 0.12 0.13 1.0"/>
+  </material>
+
+  <material name="mat_tower_stem">
+    <color rgba="0.10 0.10 0.10 1.0"/>
+  </material>
+
+  <material name="mat_dark_detail">
+    <color rgba="0.08 0.08 0.08 1.0"/>
+  </material>
+
+  <material name="mat_mid_detail">
+    <color rgba="0.18 0.18 0.19 1.0"/>
+  </material>
+
+  <material name="mat_soft_panel">
+    <color rgba="0.34 0.34 0.35 1.0"/>
+  </material>
+
+  <link name="base_plate">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.80 0.60 0.025"/>
+      </geometry>
+      <material name="mat_base"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.016" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.72 0.42 0.010"/>
+      </geometry>
+      <material name="mat_soft_panel"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.02 0.24 -0.020" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.70 0.05 0.030"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.02 -0.24 -0.020" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.70 0.05 0.030"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.24 0 0.0175" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.14 0.50 0.006"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+  </link>
+
+  <joint name="payload_mount_joint" type="fixed">
+    <parent link="default_mount"/>
+    <child link="base_plate"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_plate_joint" type="fixed">
+    <parent link="base_plate"/>
+    <child link="payload_base_link"/>
+    <origin xyz="-0.30 0 0.0625" rpy="0 0 0"/>
+  </joint>
+
+  <link name="lidar_tower">
+    <visual>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.03" radius="0.06"/>
+      </geometry>
+      <material name="mat_canister_cap"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.04" radius="0.035"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.31" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.50" radius="0.022"/>
+      </geometry>
+      <material name="mat_tower_stem"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.45" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.03" radius="0.035"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.56" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.01" radius="0.060"/>
+      </geometry>
+      <material name="mat_canister_cap"/>
+    </visual>
+  </link>
+
+  <joint name="lidar_tower_joint" type="fixed">
+    <parent link="base_plate"/>
+    <child link="lidar_tower"/>
+    <origin xyz="0 0 0.0125" rpy="0 0 0"/>
+  </joint>
+
+  <link name="turret_lidar_mount"/>
+
+  <joint name="turret_lidar_mount_joint" type="fixed">
+    <parent link="lidar_tower"/>
+    <child link="turret_lidar_mount"/>
+    <origin xyz="0 0 0.565" rpy="0 0 0"/>
+  </joint>
+
+  <link name="payload_base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.20 0.58 0.10"/>
+      </geometry>
+      <material name="mat_base"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 -0.19 0.07" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.20" radius="0.10"/>
+      </geometry>
+      <material name="mat_base"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0.19 0.07" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.20" radius="0.10"/>
+      </geometry>
+      <material name="mat_base"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0 0 0.085" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.16 0.44 0.05"/>
+      </geometry>
+      <material name="mat_soft_panel"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.055 0 0.040" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.52 0.06"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.055 0 0.040" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.52 0.06"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.035 0.19 0.105" rpy="0 0.45 0"/>
+      <geometry>
+        <box size="0.10 0.06 0.05"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.035 -0.19 0.105" rpy="0 0.45 0"/>
+      <geometry>
+        <box size="0.10 0.06 0.05"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.045 0.19 0.102" rpy="0 -0.35 0"/>
+      <geometry>
+        <box size="0.09 0.06 0.045"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.045 -0.19 0.102" rpy="0 -0.35 0"/>
+      <geometry>
+        <box size="0.09 0.06 0.045"/>
+      </geometry>
+      <material name="mat_mid_detail"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.07 0 0.095" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.40 0.02"/>
+      </geometry>
+      <material name="mat_canister_cap"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.085 0 0.070" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.02 0.36 0.05"/>
+      </geometry>
+      <material name="mat_dark_detail"/>
+    </visual>
+  </link>
+
+  <link name="left_canister_link">
+    <visual>
+      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="1.00" radius="0.09"/>
+      </geometry>
+      <material name="mat_canister_body"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.10"/>
+      </geometry>
+      <material name="mat_canister_cap"/>
+    </visual>
+  </link>
+
+  <link name="right_canister_link">
+    <visual>
+      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="1.00" radius="0.09"/>
+      </geometry>
+      <material name="mat_canister_body"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.10"/>
+      </geometry>
+      <material name="mat_canister_cap"/>
+    </visual>
+  </link>
+
+  <joint name="left_canister_joint" type="revolute">
+    <parent link="payload_base_link"/>
+    <child link="left_canister_link"/>
+    <origin xyz="0 0.19 0.05" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
+  </joint>
+
+  <joint name="right_canister_joint" type="revolute">
+    <parent link="payload_base_link"/>
+    <child link="right_canister_link"/>
+    <origin xyz="0 -0.19 0.05" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
+  </joint>
+
+</robot>

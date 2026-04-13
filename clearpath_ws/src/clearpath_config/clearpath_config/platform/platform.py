@@ -102,6 +102,8 @@ class PlatformConfig(BaseConfig):
     BATTERY = "battery"
     # Wheel
     WHEEL = "wheel"
+    # Platform color
+    COLOR = "color"
     # Enable/disable EKF
     ENABLE_EKF = 'enable_ekf'
 
@@ -116,6 +118,7 @@ class PlatformConfig(BaseConfig):
             CONTROL: CONTROL,
             BATTERY: BATTERY,
             WHEEL: WHEEL,
+            COLOR: COLOR,
             ENABLE_EKF: ENABLE_EKF
         }
     }
@@ -133,6 +136,7 @@ class PlatformConfig(BaseConfig):
         CONTROL: "",
         BATTERY: BatteryConfig.DEFAULTS,
         WHEEL: "default",
+        COLOR: "yellow",
         ENABLE_EKF: True,
     }
 
@@ -145,6 +149,7 @@ class PlatformConfig(BaseConfig):
             battery: dict = DEFAULTS[BATTERY],
             extras: dict = DEFAULTS[EXTRAS],
             wheel: dict = DEFAULTS[WHEEL],
+            color: str = DEFAULTS[COLOR],
             enable_ekf: bool = DEFAULTS[ENABLE_EKF],
             ) -> None:
         # Initialization
@@ -158,6 +163,7 @@ class PlatformConfig(BaseConfig):
         self.launch = self.DEFAULTS[self.LAUNCH]
         self.control = self.DEFAULTS[self.CONTROL]
         self.wheel = wheel
+        self.color = color
         self.enable_ekf = enable_ekf
         # Setter Template
         setters = {
@@ -167,6 +173,7 @@ class PlatformConfig(BaseConfig):
             self.KEYS[self.BATTERY]: PlatformConfig.battery,
             self.KEYS[self.EXTRAS]: PlatformConfig.extras,
             self.KEYS[self.WHEEL]: PlatformConfig.wheel,
+            self.KEYS[self.COLOR]: PlatformConfig.color,
             self.KEYS[self.ENABLE_EKF]: PlatformConfig.enable_ekf
         }
         super().__init__(setters, config, self.PLATFORM)
@@ -342,6 +349,18 @@ class PlatformConfig(BaseConfig):
     @wheel.setter
     def wheel(self, value: str) -> None:
         self._wheel = value
+
+    @property
+    def color(self) -> str:
+        self.set_config_param(
+            key=self.KEYS[self.COLOR],
+            value=self._color
+        )
+        return self._color
+
+    @color.setter
+    def color(self, value: str) -> None:
+        self._color = value
 
     @property
     def enable_ekf(self) -> bool:
