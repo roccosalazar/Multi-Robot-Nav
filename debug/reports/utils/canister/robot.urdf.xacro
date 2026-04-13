@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="w200-0001">
+
+  <!-- Common -->
+  <xacro:include filename="$(find clearpath_platform_description)/urdf/common.urdf.xacro"/>
+
+  <!-- Platform -->
+  <xacro:include filename="$(find clearpath_platform_description)/urdf/w200/w200.urdf.xacro"/>
+  <xacro:w200 wheel="track" color="dark_olive"/>
+
+
+  <!-- Attachments -->
+
+
+  <!-- Links -->
+
+
+  <!-- Mounts -->
+
+
+  <!-- Sensors -->
+
+
+  <!-- Manipulators -->
+
+
+  <!-- Extras -->
+
+  <xacro:include filename="/home/ubuntu/Multi-Robot-Nav/debug/reports/utils/canister/warthog_with_impact.urdf.xacro"/>
+
+</robot>

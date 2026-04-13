@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="warthog_with_impact">
+
+  <xacro:include filename="/home/ubuntu/Multi-Robot-Nav/debug/reports/utils/canister/impact_turret.xacro"/>
+
+  <!-- IMPACT-inspired turret -->
+  <xacro:impact_turret
+      parent="default_mount"
+      prefix="impact_"
+      xyz="0 0 0"
+      rpy="0 0 0"
+      yaw_limit="3.14159"
+      pitch_min="-0.35"
+      pitch_max="0.95"/>
+
+</robot>

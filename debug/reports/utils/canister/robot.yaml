@@ -1,0 +1,21 @@
+serial_number: w200-0001
+version: 0
+
+system:
+  hosts:
+    - hostname: cpr-w200-0001
+      ip: 192.168.131.1
+  ros2:
+    namespace: aramis
+
+platform:
+  wheel: track
+  color: dark_olive
+  extras:
+    urdf:
+      path: /home/ubuntu/Multi-Robot-Nav/debug/reports/utils/canister/warthog_with_impact.urdf.xacro
+    ros_parameters:
+      platform_velocity_controller:
+        enable_odom_tf: false
+      ekf_node:
+        publish_tf: false
