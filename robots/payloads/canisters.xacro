@@ -82,27 +82,6 @@
         <box size="0.80 0.60 0.025"/>
       </geometry>
     </collision>
-
-    <collision>
-      <origin xyz="-0.02 0.24 -0.020" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.70 0.05 0.030"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="-0.02 -0.24 -0.020" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.70 0.05 0.030"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.24 0 0.0175" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.14 0.50 0.006"/>
-      </geometry>
-    </collision>
   </link>
 
   <joint name="payload_mount_joint" type="fixed">
@@ -165,37 +144,9 @@
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <origin xyz="0 0 0.28" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.03" radius="0.06"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
-      <geometry>
-        <cylinder length="0.04" radius="0.035"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 0 0.31" rpy="0 0 0"/>
-      <geometry>
-        <cylinder length="0.50" radius="0.022"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 0 0.45" rpy="0 0 0"/>
-      <geometry>
-        <cylinder length="0.03" radius="0.035"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 0 0.56" rpy="0 0 0"/>
-      <geometry>
-        <cylinder length="0.01" radius="0.060"/>
+        <cylinder length="0.58" radius="0.06"/>
       </geometry>
     </collision>
   </link>
@@ -324,88 +275,18 @@
     </visual>
 
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
       <geometry>
-        <box size="0.20 0.58 0.10"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 -0.19 0.07" rpy="1.5708 0 0"/>
-      <geometry>
-        <cylinder length="0.20" radius="0.10"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0 0.19 0.07" rpy="1.5708 0 0"/>
-      <geometry>
-        <cylinder length="0.20" radius="0.10"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.055 0 0.040" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.03 0.52 0.06"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="-0.055 0 0.040" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.03 0.52 0.06"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.035 0.19 0.105" rpy="0 0.45 0"/>
-      <geometry>
-        <box size="0.10 0.06 0.05"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.035 -0.19 0.105" rpy="0 0.45 0"/>
-      <geometry>
-        <box size="0.10 0.06 0.05"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="-0.045 0.19 0.102" rpy="0 -0.35 0"/>
-      <geometry>
-        <box size="0.09 0.06 0.045"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="-0.045 -0.19 0.102" rpy="0 -0.35 0"/>
-      <geometry>
-        <box size="0.09 0.06 0.045"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.07 0 0.095" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.03 0.40 0.02"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="-0.085 0 0.070" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.02 0.36 0.05"/>
+        <box size="0.20 0.58 0.18"/>
       </geometry>
     </collision>
   </link>
 
   <link name="left_canister_link">
     <inertial>
-      <origin xyz="0.325 0 0.10" rpy="0 0 0"/>
-      <mass value="21.0"/>
-      <inertia ixx="0.067" ixy="0.0" ixz="0.0" iyy="1.90" iyz="0.0" izz="1.90"/>
+      <origin xyz="0.35 0 0.10" rpy="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia ixx="0.015" ixy="0.0" ixz="0.0" iyy="0.60" iyz="0.0" izz="0.60"/>
     </inertial>
 
     <visual>
@@ -413,7 +294,7 @@
       <geometry>
         <cylinder length="1.00" radius="0.09"/>
       </geometry>
-      <material name="mat_canister_cap"/>
+      <material name="mat_canister_body"/>
     </visual>
 
     <visual>
@@ -425,25 +306,18 @@
     </visual>
 
     <collision>
-      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <origin xyz="0.35 0 0.10" rpy="0 1.57079632679 0"/>
       <geometry>
-        <cylinder length="1.00" radius="0.09"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
-      <geometry>
-        <cylinder length="0.10" radius="0.10"/>
+        <cylinder length="1.10" radius="0.10"/>
       </geometry>
     </collision>
   </link>
 
   <link name="right_canister_link">
     <inertial>
-      <origin xyz="0.325 0 0.10" rpy="0 0 0"/>
-      <mass value="21.0"/>
-      <inertia ixx="0.067" ixy="0.0" ixz="0.0" iyy="1.90" iyz="0.0" izz="1.90"/>
+      <origin xyz="0.35 0 0.10" rpy="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia ixx="0.015" ixy="0.0" ixz="0.0" iyy="0.60" iyz="0.0" izz="0.60"/>
     </inertial>
 
     <visual>
@@ -451,7 +325,7 @@
       <geometry>
         <cylinder length="1.00" radius="0.09"/>
       </geometry>
-      <material name="mat_canister_cap"/>
+      <material name="mat_canister_body"/>
     </visual>
 
     <visual>
@@ -463,16 +337,9 @@
     </visual>
 
     <collision>
-      <origin xyz="0.30 0 0.10" rpy="0 1.57079632679 0"/>
+      <origin xyz="0.35 0 0.10" rpy="0 1.57079632679 0"/>
       <geometry>
-        <cylinder length="1.00" radius="0.09"/>
-      </geometry>
-    </collision>
-
-    <collision>
-      <origin xyz="0.77 0 0.10" rpy="0 1.57079632679 0"/>
-      <geometry>
-        <cylinder length="0.10" radius="0.10"/>
+        <cylinder length="1.10" radius="0.10"/>
       </geometry>
     </collision>
   </link>
@@ -481,48 +348,64 @@
     <parent link="payload_base_link"/>
     <child link="left_canister_link"/>
     <origin xyz="0 0.19 0.05" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
-    <dynamics damping="1.0" friction="0.1"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0" upper="0.87" effort="20" velocity="1.2"/>
+    <dynamics damping="1.5" friction="0.1"/>
   </joint>
 
   <joint name="right_canister_joint" type="revolute">
     <parent link="payload_base_link"/>
     <child link="right_canister_link"/>
     <origin xyz="0 -0.19 0.05" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-0.87" upper="0" effort="10" velocity="1.0"/>
-    <dynamics damping="1.0" friction="0.1"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0" upper="0.87" effort="20" velocity="1.2"/>
+    <dynamics damping="1.5" friction="0.1"/>
   </joint>
 
-  <gazebo>
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>left_canister_joint</joint_name>
-      <joint_index>0</joint_index>
-      <p_gain>80.0</p_gain>
-      <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
-      <i_max>0.0</i_max>
-      <i_min>0.0</i_min>
-      <cmd_max>10.0</cmd_max>
-      <cmd_min>-10.0</cmd_min>
-      <topic>/left_canister/cmd_pos</topic>
-    </plugin>
+  <xacro:if value="$(arg is_sim)">
+    <ros2_control name="canister_state_hardware" type="system">
+      <hardware>
+        <plugin>ign_ros2_control/IgnitionSystem</plugin>
+      </hardware>
+      <joint name="left_canister_joint">
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="right_canister_joint">
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+    </ros2_control>
+  </xacro:if>
 
-    <plugin filename="gz-sim-joint-position-controller-system"
-            name="gz::sim::systems::JointPositionController">
-      <joint_name>right_canister_joint</joint_name>
-      <joint_index>0</joint_index>
-      <p_gain>80.0</p_gain>
-      <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
-      <i_max>0.0</i_max>
-      <i_min>0.0</i_min>
-      <cmd_max>10.0</cmd_max>
-      <cmd_min>-10.0</cmd_min>
-      <topic>/right_canister/cmd_pos</topic>
-    </plugin>
-  </gazebo>
+<gazebo>
+  <plugin filename="gz-sim-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>left_canister_joint</joint_name>
+    <joint_index>0</joint_index>
+    <p_gain>60.0</p_gain>
+    <i_gain>0.0</i_gain>
+    <d_gain>6.0</d_gain>
+    <i_max>0.0</i_max>
+    <i_min>0.0</i_min>
+    <cmd_max>20.0</cmd_max>
+    <cmd_min>-20.0</cmd_min>
+    <topic>/left_canister/cmd_pos</topic>
+  </plugin>
+
+  <plugin filename="gz-sim-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>right_canister_joint</joint_name>
+    <joint_index>0</joint_index>
+    <p_gain>60.0</p_gain>
+    <i_gain>0.0</i_gain>
+    <d_gain>6.0</d_gain>
+    <i_max>0.0</i_max>
+    <i_min>0.0</i_min>
+    <cmd_max>20.0</cmd_max>
+    <cmd_min>-20.0</cmd_min>
+    <topic>/right_canister/cmd_pos</topic>
+  </plugin>
+</gazebo>
 
 </robot>
