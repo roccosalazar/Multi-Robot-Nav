@@ -14,7 +14,7 @@ The current custom logic in this repository is centered on:
 - launching single-robot and multi-robot `mrg_slam` instances in robot namespaces,
 - publishing comparable pose streams for evaluation:
   - ground truth from Gazebo dynamic pose,
-	- SLAM pose from TF (`map -> <robot>/base_link`) published on `/<robot>/slam/pose` with `header.frame_id=<world>` (default `warehouse`).
+  - SLAM pose from TF (`map -> <robot>/base_link`) published on `/<robot>/slam/pose` with `header.frame_id=<world>` (default `warehouse`).
 
 ## What The Project Is Building
 
@@ -42,6 +42,8 @@ Top-level directories:
 - `robots/`: generated Clearpath setup for each robot (`aramis`, `athos`, `porthos`).
 - `clearpath_ws/`: vendored Clearpath ROS 2 stack used by spawning and simulation.
 - `Multi-Robot-Graph-SLAM/`: vendored SLAM stack containing `mrg_slam` and dependencies.
+- `.devcontainer/`: development container definitions for AMD64 and ARM64 environments.
+- `debug/reports/utils/`: local URDF/Xacro and RViz prototyping assets used for payload and model iteration.
 - `source_workspaces.sh`: helper script that sources all three local workspaces.
 
 ## How Clearpath Files Fit Into This Project
@@ -179,6 +181,28 @@ The local SLAM stack was modified to integrate with the Clearpath topic/frame co
 5. Prefiltering robustness patch
 	- In `mrg_slam/apps/prefiltering_component.cpp`, TF lookup now has a fallback path that prepends namespace to source frame when incoming PointCloud2 frame IDs are unprefixed but TF tree is prefixed.
 
+6. Launch parameter overwrite hardening
+	- In `mrg_slam/launch/mrg_slam.launch.py`, `overwrite_yaml_params_from_cli(...)` now supports `excluded_keys`.
+	- For `map2robotmap_publisher`, CLI pose arguments (`x/y/z/roll/pitch/yaw`) are excluded so the static `map -> <robot>/map` transform remains driven by YAML values.
+
+### Changes made in local robot and tooling layers
+
+These changes are project-local (outside `clearpath_ws` and `Multi-Robot-Graph-SLAM`) and support simulation realism, prototyping, and developer workflow.
+
+1. Payload physical model and control updates
+	- In `robots/payloads/canisters.xacro`, multiple payload links now include inertial and collision properties for more realistic dynamics.
+	- Canister joints were tuned (axis/limits/effort/dynamics) and simulation control interfaces were added.
+	- Gazebo joint position controllers expose namespaced command topics:
+	  - `/<namespace>/left_canister/cmd_pos`
+	  - `/<namespace>/right_canister/cmd_pos`
+
+2. Local URDF/Xacro prototyping assets
+	- Added experimental IMPACT turret and integration assets under `debug/reports/utils/canister/`.
+	- Additional prototyping files are present in `debug/reports/utils/` and `debug/reports/utils/canister_2/` for payload iteration.
+
+3. Devcontainer tooling update
+	- Added `ripgrep` to both `.devcontainer/Dockerfile.amd64` and `.devcontainer/Dockerfile.arm64` for faster in-container code search.
+
 ### Net effect for this project
 
 These local upstream changes support the project architecture in this repository:
@@ -186,7 +210,9 @@ These local upstream changes support the project architecture in this repository
 - global/shared TF transport (`/tf`, `/tf_static`) across all robots,
 - namespaced frame IDs to keep robot frames distinct,
 - direct consumption of Clearpath sensor topics by `mrg_slam`,
-- more reliable frame resolution in mixed prefixed/unprefixed simulation conditions.
+- more reliable frame resolution in mixed prefixed/unprefixed simulation conditions,
+- namespaced simulation control of canister joints,
+- updated RViz layouts for both single-robot and three-robot SLAM monitoring.
 
 ## Workspace Directory (Complete Guide)
 
@@ -213,7 +239,8 @@ workspace/src/
 │   │   ├── slam_bringup.launch.py
 │   │   └── multi_slam_bringup.launch.py
 │   └── rviz/
-│       └── aramis.rviz
+│       ├── aramis.rviz
+│       └── multi_slam.rviz
 └── slam_evaluation/
 	 ├── package.xml
 	 ├── setup.py
@@ -289,7 +316,13 @@ Important launch files:
 	- Category: multi-robot SLAM bringup + SLAM output normalization for evaluation.
 
 6. `rviz/aramis.rviz`
-	- RViz profile configured for namespaced topics such as `/aramis/mrg_slam/map_points`, `/aramis/mrg_slam/markers`, and `/aramis/scan_matching_odometry/odom`.
+	- Single-robot RViz profile for `aramis`, configured for namespaced topics such as `/aramis/mrg_slam/map_points`, `/aramis/mrg_slam/markers`, and `/aramis/scan_matching_odometry/odom`.
+	- Includes current payload/canister TF/link visualization.
+	- Category: SLAM visualization.
+
+7. `rviz/multi_slam.rviz`
+	- Multi-robot RViz profile covering `aramis`, `athos`, and `porthos` TF trees and robot descriptions.
+	- Includes SLAM map/marker/odometry views for multi-robot runs.
 	- Category: SLAM visualization.
 
 ### `slam_evaluation` (SLAM vs ground-truth pose extraction)
@@ -451,6 +484,12 @@ ros2 launch musketeers_bringup multi_slam_bringup.launch.py \
 	world:=warehouse
 ```
 
+### F) Multi-robot RViz profile
+
+```bash
+rviz2 -d $HOME/Multi-Robot-Nav/workspace/src/musketeers_bringup/rviz/multi_slam.rviz
+```
+
 `multi_slam_bringup.launch.py` defaults to `config:=musketeers.yaml`.
 
 ## Practical Notes
@@ -459,5 +498,6 @@ ros2 launch musketeers_bringup multi_slam_bringup.launch.py \
 - Generated robot launch files currently contain absolute paths rooted at `/home/ubuntu/Multi-Robot-Nav/...`.
 - World defaults are now aligned to `warehouse` across workspace launch files.
 - W200 body color can now be configured per robot setup using `platform.color` (for example `olive` to match the IMPACT palette).
+- Canister joint command topics are namespaced as `/<robot_namespace>/left_canister/cmd_pos` and `/<robot_namespace>/right_canister/cmd_pos`.
 - For SLAM vs ground-truth pose comparison, use the same `world:=...` in both simulation and SLAM bringup, because `slam_bringup` sets `/robot/slam/pose.header.frame_id` from `world`.
 - For vertical alignment, keep SLAM init pose at `x:=0.0 y:=0.0 z:=0.0` and use `slam_pose_offset_z:=0.35` (or your actual spawn height) so `/robot/slam/pose` is directly comparable with `/robot/ground_truth/pose`.
