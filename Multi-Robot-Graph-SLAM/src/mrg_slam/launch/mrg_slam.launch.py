@@ -43,8 +43,11 @@ PARAM_MAPPING = {
 
 
 # Overwrite the parameters from the yaml file with the ones from the cli if the cli string is not empty
-def overwrite_yaml_params_from_cli(yaml_params, cli_params):
+def overwrite_yaml_params_from_cli(yaml_params, cli_params, excluded_keys=None):
+    excluded_keys = set() if excluded_keys is None else set(excluded_keys)
     for key, value in cli_params.items():
+        if key in excluded_keys:
+            continue
         if key in yaml_params and value != '':
             # Since all parameters from cli in ROS2 are strings, we need to infer the correct data type
             yaml_params[key] = PARAM_MAPPING[key](value)
@@ -93,8 +96,11 @@ def launch_setup(context, *args, **kwargs):
     lidar2base_publisher_params = overwrite_yaml_params_from_cli(
         lidar2base_publisher_params, context.launch_configurations
     )
+    # Keep map2robotmap static transform at YAML values (typically zero); pose CLI args are for mrg_slam init only.
     map2robotmap_publisher_params = overwrite_yaml_params_from_cli(
-        map2robotmap_publisher_params, context.launch_configurations
+        map2robotmap_publisher_params,
+        context.launch_configurations,
+        excluded_keys={'x', 'y', 'z', 'roll', 'pitch', 'yaw'},
     )
     prefiltering_params = overwrite_yaml_params_from_cli(prefiltering_params, context.launch_configurations)
     scan_matching_odometry_params = overwrite_yaml_params_from_cli(

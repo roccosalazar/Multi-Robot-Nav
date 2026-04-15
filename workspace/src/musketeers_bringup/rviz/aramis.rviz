@@ -7,8 +7,10 @@ Panels:
         - /Global Options1
         - /Status1
         - /RobotModel1
+        - /PointCloud21
+        - /PointCloud22
       Splitter Ratio: 0.5
-    Tree Height: 529
+    Tree Height: 1305
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -55,27 +57,23 @@ Visualization Manager:
         All Enabled: true
         aramis/base_link:
           Value: true
+        aramis/base_plate:
+          Value: true
         aramis/chassis_link:
           Value: true
         aramis/default_mount:
           Value: true
         aramis/diff_link:
           Value: true
-        aramis/disk_0_link:
-          Value: true
-        aramis/disk_0_mount:
-          Value: true
-        aramis/front_left_track_link:
-          Value: true
         aramis/front_left_wheel_link:
-          Value: true
-        aramis/front_right_track_link:
           Value: true
         aramis/front_right_wheel_link:
           Value: true
         aramis/imu_0_link:
           Value: true
         aramis/keyframe:
+          Value: true
+        aramis/left_canister_link:
           Value: true
         aramis/left_diff_unit_headlight_link:
           Value: true
@@ -87,21 +85,19 @@ Visualization Manager:
           Value: true
         aramis/lidar3d_0_link:
           Value: true
+        aramis/lidar_tower:
+          Value: true
         aramis/map:
           Value: true
         aramis/odom:
           Value: true
-        aramis/post_0_link:
-          Value: true
-        aramis/post_0_mount:
-          Value: true
-        aramis/rear_left_track_link:
+        aramis/payload_base_link:
           Value: true
         aramis/rear_left_wheel_link:
           Value: true
-        aramis/rear_right_track_link:
-          Value: true
         aramis/rear_right_wheel_link:
+          Value: true
+        aramis/right_canister_link:
           Value: true
         aramis/right_diff_unit_headlight_link:
           Value: true
@@ -111,13 +107,11 @@ Visualization Manager:
           Value: true
         aramis/robot/base_link/lidar3d_0:
           Value: true
-        aramis/structure_link:
-          Value: true
-        aramis/top_tower_link:
-          Value: true
-        aramis/tower_link:
+        aramis/turret_lidar_mount:
           Value: true
         map:
+          Value: true
+        odom:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -128,7 +122,48 @@ Visualization Manager:
         map:
           aramis/map:
             aramis/odom:
-              {}
+              aramis/base_link:
+                aramis/chassis_link:
+                  aramis/default_mount:
+                    aramis/base_plate:
+                      aramis/lidar_tower:
+                        aramis/turret_lidar_mount:
+                          aramis/lidar3d_0_link:
+                            aramis/lidar3d_0_laser:
+                              {}
+                            aramis/robot/base_link/lidar3d_0:
+                              {}
+                      aramis/payload_base_link:
+                        aramis/left_canister_link:
+                          {}
+                        aramis/right_canister_link:
+                          {}
+                  aramis/diff_link:
+                    {}
+                  aramis/imu_0_link:
+                    {}
+                  aramis/left_diff_unit_link:
+                    aramis/front_left_wheel_link:
+                      {}
+                    aramis/left_diff_unit_headlight_link:
+                      {}
+                    aramis/left_diff_unit_taillight_link:
+                      {}
+                    aramis/rear_left_wheel_link:
+                      {}
+                  aramis/right_diff_unit_link:
+                    aramis/front_right_wheel_link:
+                      {}
+                    aramis/rear_right_wheel_link:
+                      {}
+                    aramis/right_diff_unit_headlight_link:
+                      {}
+                    aramis/right_diff_unit_taillight_link:
+                      {}
+              aramis/keyframe:
+                {}
+          odom:
+            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -153,6 +188,11 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+        base_plate:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         chassis_link:
           Alpha: 1
           Show Axes: false
@@ -167,26 +207,7 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        disk_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        disk_0_mount:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        front_left_track_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         front_left_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        front_right_track_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -200,6 +221,11 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+        left_canister_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         left_diff_unit_headlight_link:
           Alpha: 1
           Show Axes: false
@@ -225,16 +251,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        post_0_link:
+        lidar_tower:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        post_0_mount:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rear_left_track_link:
+        payload_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -244,12 +266,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_right_track_link:
+        rear_right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rear_right_wheel_link:
+        right_canister_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -269,20 +291,10 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        structure_link:
+        turret_lidar_mount:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-          Value: true
-        top_tower_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tower_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
@@ -294,14 +306,14 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: 8.695162773132324
+        Min Value: -0.34700992703437805
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: Intensity
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -314,7 +326,7 @@ Visualization Manager:
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.009999999776482582
-      Style: Flat Squares
+      Style: Points
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -337,7 +349,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: ""
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -358,12 +370,16 @@ Visualization Manager:
         Value: /aramis/mrg_slam/map_points_service
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        {}
+        last_nodes: true
+        loop_close_radius: true
+        main_edges: true
+        node_names: true
+        nodes: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -456,33 +472,33 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 14.049280166625977
+      Distance: 11.780959129333496
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.20571400225162506
-        Y: 0.4923056364059448
-        Z: -0.20265088975429535
+        X: 1.9100642204284668
+        Y: -2.702821969985962
+        Z: 0.10562792420387268
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7203977704048157
+      Pitch: 0.7103979587554932
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0804001092910767
+      Yaw: 3.5504026412963867
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1006
+  Height: 1782
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001da000002fffc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b000000ab00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed0000043800000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000069000002ff0000017800fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000014d000002fffc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000069000002ff0000012300fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000078000000051fc0100000002fb0000000800540069006d00650100000000000007800000046000fffffffb0000000800540069006d006501000000000000045000000000000000000000059a000002ff00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000002d800000607fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b000000ab00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed0000043800000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000069000006070000017800fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000014d000002fffc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000069000002ff0000012300fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000b4000000051fc0100000002fb0000000800540069006d0065010000000000000b400000046000fffffffb0000000800540069006d006501000000000000045000000000000000000000085c0000060700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -491,6 +507,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1920
-  X: 1760
-  Y: 0
+  Width: 2880
+  X: 0
+  Y: 1144
