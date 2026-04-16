@@ -417,7 +417,8 @@ cd clearpath_ws
 colcon build --symlink-install
 
 cd ../Multi-Robot-Graph-SLAM
-colcon build --symlink-install
+export MAKEFLAGS="-j 2"
+colcon build --symlink-install --parallel-workers 2 --executor sequential
 
 cd ../workspace
 colcon build --symlink-install

@@ -16,5 +16,3 @@ Available profiles:
 3. When the list appears, select the profile that matches your machine.
 
 If the list does not appear, use `Dev Containers: Open Folder in Container...` from the project root.
-
-This way you no longer need to edit the same file when switching between Generic and NVIDIA profiles, and `git status` will not report unnecessary changes in the devcontainer setup.

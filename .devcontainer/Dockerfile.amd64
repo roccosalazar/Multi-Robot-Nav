@@ -99,7 +99,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     && sudo rm -rf /var/lib/apt/lists/*
 
 RUN sudo apt-get update && sudo apt-get install -y \
-    software-properties-common \ 
+    software-properties-common \
     build-essential \
     cmake \
     python3-pip \
@@ -148,4 +148,74 @@ RUN wget -q -O- https://packagecloud.io/dcommander/virtualgl/gpgkey | \
 RUN sudo apt-get update && sudo apt-get install -y \
     ros-humble-clearpath-desktop \
     ros-humble-clearpath-config-live \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+### DEPENDENCIES FOR SWARM-SLAM
+# Upgrade pip first
+RUN sudo python3 -m pip install --upgrade pip setuptools wheel
+
+# Install Python packages
+RUN sudo python3 -m pip install --no-cache-dir --ignore-installed \
+    "networkx>=2.8.8" \
+    numba \
+    numpy \
+    open3d \
+    Pillow \
+    scikit-learn \
+    scipy \
+    sortedcontainers \
+    distinctipy \
+    numpy-quaternion
+
+# TEASER++ dependencies
+RUN sudo apt-get update && sudo apt-get install -y \
+    libeigen3-dev \
+    libboost-all-dev \
+    python3-dev \
+    pybind11-dev \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# Install TEASER++ Python package from source
+RUN cd /tmp && \
+    git clone --recursive https://github.com/MIT-SPARK/TEASER-plusplus.git && \
+    cd TEASER-plusplus && \
+    git submodule update --init --recursive && \
+    sudo python3 -m pip install --no-cache-dir . && \
+    sudo ldconfig && \
+    cd / && \
+    sudo rm -rf /tmp/TEASER-plusplus
+
+# GTSAM dependencies
+RUN sudo apt-get update && sudo apt-get install -y \
+    libboost-all-dev \
+    python3-dev \
+    python3-pip \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# Install GTSAM 4.1.1 with Python bindings
+RUN cd /tmp && \
+    git clone https://github.com/borglab/gtsam.git && \
+    cd gtsam && \
+    git checkout 4.1.1 && \
+    mkdir build && \
+    cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGTSAM_BUILD_PYTHON=OFF \
+        -DGTSAM_WITH_TBB=OFF && \
+    cmake --build . -j2 && \
+    sudo cmake --install . && \
+    sudo ldconfig && \
+    cd / && \
+    sudo rm -rf /tmp/gtsam
+
+# Install Swarm-SLAM dependencies
+RUN sudo apt-get update && sudo apt-get install -y \
+    libpcl-dev \
+    ros-humble-nav2-common \
+    ros-humble-nav2-msgs \
+    python3-pytest \
+    ros-humble-rtabmap \
+    ros-humble-rtabmap-conversions \
+    ros-humble-rtabmap-msgs \
     && sudo rm -rf /var/lib/apt/lists/*
