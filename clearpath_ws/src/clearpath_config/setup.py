@@ -75,5 +75,4 @@ setup(
     maintainer_email="lcamero@clearpathrobotics.com",
     description="Clearpath Configuration YAML Parser and Writer",
     license="BSD-3",
-    tests_require=['pytest']
 )

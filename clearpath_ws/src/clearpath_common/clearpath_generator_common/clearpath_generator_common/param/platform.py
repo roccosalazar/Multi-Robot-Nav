@@ -260,11 +260,61 @@ class PlatformParam():
 
     class LocalizationParam(BaseParam):
         EKF_NODE = 'ekf_node'
+        TF_FRAME_PREFIX_ENABLE = 'tf_frame_prefix_enable'
+        FRAME_PARAMETERS = [
+            'odom_frame',
+            'base_link_frame',
+            'world_frame'
+        ]
         imu_config = [False, False, False,
                       False, False, False,
                       False, False, False,
                       False, False, True,
                       False, False, False]
+
+        def _is_tf_frame_prefix_enabled(self) -> bool:
+            control_param_file = ParamFile(
+                name=PlatformParam.CONTROL,
+                package=self.clearpath_control_package,
+                path=f'config/{self.platform}',
+                parameters={}
+            )
+            try:
+                control_param_file.read()
+            except (FileNotFoundError, KeyError, TypeError):
+                return False
+
+            tf_frame_prefix_enable = False
+
+            for node_parameters in control_param_file.parameters.values():
+                if isinstance(node_parameters, dict) and self.TF_FRAME_PREFIX_ENABLE in node_parameters:
+                    tf_frame_prefix_enable = bool(node_parameters[self.TF_FRAME_PREFIX_ENABLE])
+
+            extras = self.clearpath_config.platform.extras.ros_parameters
+            for node_parameters in extras.values():
+                if isinstance(node_parameters, dict) and self.TF_FRAME_PREFIX_ENABLE in node_parameters:
+                    tf_frame_prefix_enable = bool(node_parameters[self.TF_FRAME_PREFIX_ENABLE])
+
+            return tf_frame_prefix_enable
+
+        def _prefix_ekf_frames_with_namespace(self) -> None:
+            namespace = self.namespace.strip('/')
+            if namespace == '' or not self._is_tf_frame_prefix_enabled():
+                return
+
+            ekf_parameters = self.param_file.parameters.get(self.EKF_NODE, {})
+            frame_updates = {}
+
+            for frame_parameter in self.FRAME_PARAMETERS:
+                frame_id = ekf_parameters.get(frame_parameter)
+                if not isinstance(frame_id, str) or frame_id in ('', '/'):
+                    continue
+                if frame_id.startswith('/') or frame_id.startswith(f'{namespace}/'):
+                    continue
+                frame_updates[frame_parameter] = f'{namespace}/{frame_id}'
+
+            if frame_updates:
+                self.param_file.update({self.EKF_NODE: frame_updates})
 
         def generate_parameters(self, use_sim_time: bool = False) -> None:
             super().generate_parameters(use_sim_time)
@@ -316,6 +366,8 @@ class PlatformParam():
                             f'{gps_name}_remove_gravitational_acceleration': True
                         }
                         self.param_file.update({self.EKF_NODE: gps_parameters})
+
+            self._prefix_ekf_frames_with_namespace()
 
     class TeleopJoyParam(BaseParam):
         def __init__(self,

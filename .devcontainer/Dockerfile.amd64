@@ -1,5 +1,15 @@
 FROM osrf/ros:humble-desktop-full
 
+# Set the working directory since global ubuntu server are slow
+USER root
+
+RUN if [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|http://archive.ubuntu.com/ubuntu/|http://it.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list && \
+        sed -i 's|http://security.ubuntu.com/ubuntu/|http://it.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list; \
+    fi && \
+    find /etc/apt/sources.list.d -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://archive.ubuntu.com/ubuntu/|http://it.archive.ubuntu.com/ubuntu/|g' {} \; && \
+    find /etc/apt/sources.list.d -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://security.ubuntu.com/ubuntu/|http://it.archive.ubuntu.com/ubuntu/|g' {} \;
+
 # Add ubuntu user with same UID and GID as your host system, if it doesn't already exist
 # Since Ubuntu 24.04, a non-root user is created by default with the name vscode and UID=1000
 ARG USERNAME=ubuntu
@@ -151,14 +161,22 @@ RUN sudo apt-get update && sudo apt-get install -y \
     && sudo rm -rf /var/lib/apt/lists/*
 
 ### DEPENDENCIES FOR SWARM-SLAM
-# Upgrade pip first
-RUN sudo python3 -m pip install --upgrade pip setuptools wheel
+# Keep distro setuptools for ROS/colcon compatibility.
+# Upgrading setuptools via pip may break "setup.py develop" used by ament_python.
+RUN sudo python3 -m pip install --upgrade pip wheel && \
+        sudo apt-get update && \
+        sudo apt-get install -y --reinstall python3-setuptools && \
+        sudo rm -rf \
+            /usr/local/lib/python3.10/dist-packages/setuptools \
+            /usr/local/lib/python3.10/dist-packages/setuptools-*.dist-info \
+            /usr/local/lib/python3.10/dist-packages/_distutils_hack && \
+        sudo rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
 RUN sudo python3 -m pip install --no-cache-dir --ignore-installed \
     "networkx>=2.8.8" \
     numba \
-    numpy \
+    "numpy<2" \
     open3d \
     Pillow \
     scikit-learn \
