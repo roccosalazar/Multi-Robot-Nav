@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     frontend:
-      odom_topic: "platform/odom/filtered"
+      odom_topic: "platform/odom"
       sensor_type: "lidar"
       pointcloud_topic: "sensors/lidar3d_0/points"
       voxel_size: 0.5
@@ -17,7 +17,7 @@
       detection_publication_max_elems_per_msg: 100
       enable_intra_robot_loop_closures: true
       keyframe_generation_ratio_distance: 0.5
-      pointcloud_odom_approx_time_sync_s: 0.1
+      pointcloud_odom_approx_time_sync_s: 2.5
       use_vertex_cover_selection: true
       map_manager_process_period_ms: 100
       global_descriptor_technique: "scancontext"
