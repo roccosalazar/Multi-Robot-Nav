@@ -313,10 +313,11 @@ install(DIRECTORY
 )
 
 # Install ROS2 launch files
-file(GLOB launch_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} launch/*.py)
-install(PROGRAMS
-  ${launch_files}
+install(DIRECTORY
+  launch/
   DESTINATION share/${PROJECT_NAME}/launch
+  FILES_MATCHING
+  PATTERN "*.py"
 )
 
 # Install ROS2 rviz configs
