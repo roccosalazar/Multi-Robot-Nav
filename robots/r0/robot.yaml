@@ -1,0 +1,38 @@
+serial_number: w200-0005
+version: 0
+system:
+  hosts:
+    - hostname: cpr-w200-0005
+      ip: 192.168.131.1
+  ros2:
+    namespace: r0
+platform:
+  wheel: track
+  color: dark_olive
+  extras:
+    urdf:
+      path: /home/ubuntu/Multi-Robot-Nav/robots/payloads/canisters.xacro
+    ros_parameters:
+      platform_velocity_controller:
+        enable_odom_tf: false
+      ekf_node:
+        publish_tf: false
+
+sensors:
+  lidar3d:
+    - model: velodyne_lidar
+      urdf_enabled: true
+      launch_enabled: true
+      parent: turret_lidar_mount
+      xyz: [0.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        velodyne_driver_node:
+          frame_id: velodyne
+          device_ip: 192.168.131.25
+          port: 2368
+          model: VLP16
+        velodyne_transform_node:
+          model: VLP16
+          fixed_frame: velodyne
+          target_frame: velodyne

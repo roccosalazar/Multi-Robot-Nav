@@ -9,7 +9,7 @@ from launch_ros.actions import Node
 ARGUMENTS = [
     DeclareLaunchArgument(
         'robot_name',
-        default_value='michael',
+        default_value='r0',
         description='Robot namespace used for all CSLAM nodes.',
     ),
     DeclareLaunchArgument('robot_id', default_value='0', description='Robot numeric identifier.'),
@@ -30,7 +30,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'config_file',
-        default_value='michael_lidar.yaml',
+        default_value='cslam_lidar.yaml',
         description='CSLAM YAML config file name.',
     ),
     DeclareLaunchArgument(
