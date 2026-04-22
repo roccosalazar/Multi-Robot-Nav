@@ -20,15 +20,38 @@ class LidarHandler:
         self.node = node
         self.params = params
 
+        self.sync_cb_count = 0
+        self.sync_accepted_count = 0
+        self.sync_rejected_odom_cov_count = 0
+        self.processed_sensor_pairs_count = 0
+        self.keyframes_created_count = 0
+        self.last_sync_abs_dt = None
+
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=100
         )
-        
-        tss = ApproximateTimeSynchronizer( [ Subscriber(self.node, PointCloud2, self.params["frontend.pointcloud_topic"], qos_profile=qos_profile),
-                                  Subscriber(self.node, Odometry, self.params["frontend.odom_topic"])], 100, self.params["frontend.pointcloud_odom_approx_time_sync_s"] )
-        tss.registerCallback(self.lidar_callback)
+
+        # Keep explicit references to message_filters objects to prevent silent
+        # callback drop when Python GC reclaims temporary objects.
+        self.pointcloud_subscriber = Subscriber(
+            self.node,
+            PointCloud2,
+            self.params["frontend.pointcloud_topic"],
+            qos_profile=qos_profile,
+        )
+        self.odom_subscriber = Subscriber(
+            self.node,
+            Odometry,
+            self.params["frontend.odom_topic"],
+        )
+        self.tss = ApproximateTimeSynchronizer(
+            [self.pointcloud_subscriber, self.odom_subscriber],
+            100,
+            self.params["frontend.pointcloud_odom_approx_time_sync_s"],
+        )
+        self.tss.registerCallback(self.lidar_callback)
 
         self.keyframe_odom_publisher = self.node.create_publisher(KeyframeOdom, "cslam/keyframe_odom", 100)
 
@@ -52,12 +75,23 @@ class LidarHandler:
 
         period_ms = self.params["frontend.map_manager_process_period_ms"]
         self.processing_timer = self.node.create_timer(float(period_ms)/1000, self.process_new_sensor_data, clock=Clock())
+        self.debug_timer = self.node.create_timer(5.0, self.debug_status_callback, clock=Clock())
 
         self.received_data = []
         self.local_descriptors_map = {}
         self.nb_local_keyframes = 0
         self.previous_keyframe = None
         self.previous_odom = None
+
+        self.node.get_logger().info(
+            "[DEBUG_LIDAR_PIPELINE] map_manager ready "
+            f"ns={self.node.get_namespace()} robot_id={self.params['robot_id']} "
+            f"pointcloud_topic={self.params['frontend.pointcloud_topic']} "
+            f"odom_topic={self.params['frontend.odom_topic']} "
+            f"sync_slop_s={self.params['frontend.pointcloud_odom_approx_time_sync_s']} "
+            f"keyframe_dist_m={self.params['frontend.keyframe_generation_ratio_distance']} "
+            f"process_period_ms={self.params['frontend.map_manager_process_period_ms']}"
+        )
 
         if self.params["evaluation.enable_logs"]:
             self.log_publisher = self.node.create_publisher(
@@ -76,9 +110,35 @@ class LidarHandler:
             pc_msg (sensor_msgs/Pointcloud2): point cloud
             odom_msg (nav_msgs/Odometry): odometry estimate
         """
+        self.sync_cb_count += 1
+
+        pc_stamp = float(pc_msg.header.stamp.sec) + float(pc_msg.header.stamp.nanosec) * 1e-9
+        odom_stamp = float(odom_msg.header.stamp.sec) + float(odom_msg.header.stamp.nanosec) * 1e-9
+        abs_dt = abs(pc_stamp - odom_stamp)
+        self.last_sync_abs_dt = abs_dt
+
+        if self.sync_cb_count <= 5 or self.sync_cb_count % 50 == 0:
+            self.node.get_logger().info(
+                "[DEBUG_LIDAR_PIPELINE] sync_cb "
+                f"count={self.sync_cb_count} "
+                f"pc_stamp={pc_stamp:.6f} odom_stamp={odom_stamp:.6f} "
+                f"abs_dt={abs_dt:.6f}s "
+                f"pc_frame={pc_msg.header.frame_id} "
+                f"odom_frame={odom_msg.header.frame_id} odom_child={odom_msg.child_frame_id} "
+                f"pc_size={pc_msg.width * pc_msg.height} "
+                f"odom_cov00={odom_msg.pose.covariance[0]:.6f}"
+            )
+
         if (odom_msg.pose.covariance[0] > 1000):
-            self.node.get_logger().warn("Odom tracking failed, skipping frame")
+            self.sync_rejected_odom_cov_count += 1
+            self.node.get_logger().warn(
+                "[DEBUG_LIDAR_PIPELINE] odom rejected "
+                f"cov00={odom_msg.pose.covariance[0]:.6f} "
+                f"sync_abs_dt={abs_dt:.6f}s"
+            )
             return
+
+        self.sync_accepted_count += 1
         self.received_data.append((pc_msg, odom_msg))
         if self.params["evaluation.enable_gps_recording"]:
             self.gps_data.append(self.latest_gps)
@@ -157,12 +217,25 @@ class LidarHandler:
         """
         if self.previous_odom is None:
             self.previous_odom = msg[1]
+            self.node.get_logger().info(
+                "[DEBUG_LIDAR_PIPELINE] keyframe decision first-frame accepted"
+            )
             return True 
         dist = self.odom_distance_squared(self.previous_odom, msg[1])
-        if dist > self.params["frontend.keyframe_generation_ratio_distance"]**2:
+        threshold_sq = self.params["frontend.keyframe_generation_ratio_distance"]**2
+        if dist > threshold_sq:
             self.previous_odom = msg[1]
+            self.node.get_logger().info(
+                "[DEBUG_LIDAR_PIPELINE] keyframe decision accepted "
+                f"dist={dist**0.5:.4f}m threshold={threshold_sq**0.5:.4f}m"
+            )
             return True
         else:
+            if self.processed_sensor_pairs_count <= 5 or self.processed_sensor_pairs_count % 50 == 0:
+                self.node.get_logger().info(
+                    "[DEBUG_LIDAR_PIPELINE] keyframe decision skipped "
+                    f"dist={dist**0.5:.4f}m threshold={threshold_sq**0.5:.4f}m"
+                )
             return False
 
     def process_new_sensor_data(self):
@@ -171,6 +244,7 @@ class LidarHandler:
         if len(self.received_data) > 0:
             data = self.received_data[0]
             self.received_data.pop(0)
+            self.processed_sensor_pairs_count += 1
             gps_data = None
             if self.params["evaluation.enable_gps_recording"]:
                 gps = self.gps_data[0]
@@ -200,7 +274,29 @@ class LidarHandler:
                     viz_msg.keyframe_id = self.nb_local_keyframes
                     viz_msg.pointcloud = msg_pointcloud.pointcloud
                     self.viz_pointcloud_publisher.publish(viz_msg)
+                self.keyframes_created_count += 1
+                self.node.get_logger().info(
+                    "[DEBUG_LIDAR_PIPELINE] keyframe created "
+                    f"id={self.nb_local_keyframes} "
+                    f"odom_stamp={float(msg_odom.odom.header.stamp.sec) + float(msg_odom.odom.header.stamp.nanosec) * 1e-9:.6f} "
+                    f"odom_frame={msg_odom.odom.header.frame_id} "
+                    f"odom_child={msg_odom.odom.child_frame_id} "
+                    f"downsampled_points={len(self.local_descriptors_map[self.nb_local_keyframes].points)}"
+                )
                 self.nb_local_keyframes = self.nb_local_keyframes + 1
+
+    def debug_status_callback(self):
+        last_dt_str = "n/a" if self.last_sync_abs_dt is None else f"{self.last_sync_abs_dt:.6f}"
+        self.node.get_logger().info(
+            "[DEBUG_LIDAR_PIPELINE] status "
+            f"sync_cb={self.sync_cb_count} "
+            f"sync_ok={self.sync_accepted_count} "
+            f"sync_reject_cov={self.sync_rejected_odom_cov_count} "
+            f"queued_pairs={len(self.received_data)} "
+            f"processed_pairs={self.processed_sensor_pairs_count} "
+            f"keyframes={self.keyframes_created_count} "
+            f"last_abs_dt_s={last_dt_str}"
+        )
 
 if __name__ == '__main__':
 

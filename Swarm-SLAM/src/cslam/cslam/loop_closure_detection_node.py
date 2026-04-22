@@ -94,6 +94,19 @@ class LoopClosureDetection(Node):
         self.params["evaluation.enable_sparsification_comparison"] = self.get_parameter(
             'evaluation.enable_sparsification_comparison').value
 
+        self.get_logger().info(
+            "[DEBUG_LC_PIPELINE] loop_closure_detection ready "
+            f"ns={self.get_namespace()} "
+            f"robot_id={self.params['robot_id']} "
+            f"max_nb_robots={self.params['max_nb_robots']} "
+            f"sensor_type={self.params['frontend.sensor_type']} "
+            f"descriptor_technique={self.params['frontend.global_descriptor_technique']} "
+            f"sim_threshold={self.params['frontend.similarity_threshold']} "
+            f"inter_robot_budget={self.params['frontend.inter_robot_loop_closure_budget']} "
+            f"descriptor_topic={self.get_parameter('frontend.global_descriptors_topic').value} "
+            f"inter_robot_matches_topic={self.get_parameter('frontend.inter_robot_matches_topic').value}"
+        )
+
         self.glcd = GlobalDescriptorLoopClosureDetection(
             self.params, self)
         self.inter_robot_detection_timer = self.create_timer(

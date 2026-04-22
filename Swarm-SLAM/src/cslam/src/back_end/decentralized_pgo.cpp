@@ -6,6 +6,29 @@
 
 using namespace cslam;
 
+namespace {
+const char *optimizer_state_to_string(OptimizerState state)
+{
+  switch (state)
+  {
+    case OptimizerState::IDLE:
+      return "IDLE";
+    case OptimizerState::WAITING_FOR_NEIGHBORS_INFO:
+      return "WAITING_FOR_NEIGHBORS_INFO";
+    case OptimizerState::POSEGRAPH_COLLECTION:
+      return "POSEGRAPH_COLLECTION";
+    case OptimizerState::WAITING_FOR_NEIGHBORS_POSEGRAPHS:
+      return "WAITING_FOR_NEIGHBORS_POSEGRAPHS";
+    case OptimizerState::START_OPTIMIZATION:
+      return "START_OPTIMIZATION";
+    case OptimizerState::OPTIMIZATION:
+      return "OPTIMIZATION";
+    default:
+      return "UNKNOWN";
+  }
+}
+} // namespace
+
 DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
     : node_(node), max_waiting_time_sec_(60, 0)
 {
@@ -207,6 +230,15 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
     sim_rdv_ = std::make_shared<SimulatedRendezVous>(node_, rendezvous_schedule_file, robot_id_);
   }
 
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] pose_graph_manager ready ns=%s robot_id=%u max_nb_robots=%u "
+      "keyframe_odom_sub=cslam/keyframe_odom optimized_pose_pub=/r%u/cslam/current_pose_estimate "
+      "broadcast_tf=%s opt_start_period_ms=%u opt_loop_period_ms=%u",
+      node_->get_namespace(), robot_id_, max_nb_robots_, robot_id_,
+      enable_broadcast_tf_frames_ ? "true" : "false",
+      pose_graph_optimization_start_period_ms_, pose_graph_optimization_loop_period_ms_);
+
   RCLCPP_INFO(node_->get_logger(), "Initialization done.");
 }
 
@@ -233,8 +265,23 @@ bool DecentralizedPGO::check_received_pose_graphs()
 void DecentralizedPGO::odometry_callback(
     const cslam_common_interfaces::msg::KeyframeOdom::ConstSharedPtr msg)
 {
+  static uint64_t odom_cb_count = 0;
+  odom_cb_count++;
+
   gtsam::Pose3 current_estimate = odometry_msg_to_pose3(msg->odom);
   gtsam::LabeledSymbol symbol(GRAPH_LABEL, ROBOT_LABEL(robot_id_), msg->id);
+
+  if (odom_cb_count <= 5 || odom_cb_count % 50 == 0)
+  {
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] keyframe_odom received count=%lu id=%u stamp=%u.%u frame=%s child=%s "
+        "odom_values=%lu current_values=%lu",
+        odom_cb_count, msg->id,
+        msg->odom.header.stamp.sec, msg->odom.header.stamp.nanosec,
+        msg->odom.header.frame_id.c_str(), msg->odom.child_frame_id.c_str(),
+        odometry_pose_estimates_->size(), current_pose_estimates_->size());
+  }
 
   odometry_pose_estimates_->insert(symbol, current_estimate);
   if (msg->id == 0)
@@ -546,6 +593,10 @@ void DecentralizedPGO::optimization_callback()
   if (optimizer_state_ == OptimizerState::IDLE &&
       odometry_pose_estimates_->size() > 0)
   {
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] optimization cycle trigger odom_values=%lu",
+        odometry_pose_estimates_->size());
     reinitialize_received_pose_graphs();
     resquest_current_neighbors();
     start_waiting();
@@ -637,6 +688,11 @@ void DecentralizedPGO::optimized_estimates_callback(
     const cslam_common_interfaces::msg::OptimizationResult::ConstSharedPtr
         msg)
 {
+  if (msg->estimates.empty())
+  {
+    RCLCPP_WARN(node_->get_logger(), "[DEBUG_BACKEND_PIPELINE] optimized_estimates received empty estimates.");
+  }
+
   if (odometry_pose_estimates_->size() > 0 && msg->estimates.size() > 0)
   {
     current_pose_estimates_ = values_msg_to_gtsam(msg->estimates);
@@ -659,6 +715,18 @@ void DecentralizedPGO::optimized_estimates_callback(
         RCLCPP_ERROR(node_->get_logger(), "Writing logs failed: %s", e.what());
       }
     }
+
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] optimized_estimates applied origin_robot_id=%u estimates=%zu",
+        origin_robot_id_, msg->estimates.size());
+  }
+  else
+  {
+    RCLCPP_WARN(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] optimized_estimates ignored odom_values=%lu estimates=%zu",
+        odometry_pose_estimates_->size(), msg->estimates.size());
   }
 }
 
@@ -754,6 +822,16 @@ void DecentralizedPGO::update_transform_to_origin(const gtsam::Pose3 &pose)
 
 void DecentralizedPGO::broadcast_tf_callback()
 {
+  static uint64_t tf_pub_count = 0;
+  tf_pub_count++;
+
+  if (odometry_pose_estimates_->empty() && (tf_pub_count <= 5 || tf_pub_count % 50 == 0))
+  {
+    RCLCPP_WARN(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] no keyframe odometry received yet; pose output may stay at default.");
+  }
+
   // Useful for visualization.
   // For tasks purposes you might want to use reference_frame_per_robot_ instead
   // Since it is updated only when a new optimization is performed.
@@ -791,6 +869,15 @@ void DecentralizedPGO::broadcast_tf_callback()
   pose_msg.header.frame_id = MAP_FRAME_ID(origin_robot_id_);
   pose_msg.pose = gtsam_pose_to_msg(latest_optimized_pose_ * current_pose_diff);
   optimized_pose_estimate_publisher_->publish(pose_msg);
+
+  if (tf_pub_count <= 5 || tf_pub_count % 50 == 0)
+  {
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] pose published topic=/r%u/cslam/current_pose_estimate frame=%s pos=(%.3f, %.3f, %.3f)",
+        robot_id_, pose_msg.header.frame_id.c_str(),
+        pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.pose.position.z);
+  }
 }
 
 gtsam::Values
@@ -837,6 +924,10 @@ void DecentralizedPGO::start_optimization()
 
   if (!current_pose_estimates_->exists(first_symbol))
   {
+    RCLCPP_WARN(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] optimization skipped: first symbol missing. current_values=%lu odom_values=%lu",
+        current_pose_estimates_->size(), odometry_pose_estimates_->size());
     return;
   }
 
@@ -847,6 +938,11 @@ void DecentralizedPGO::start_optimization()
   if (enable_logs_){
     logger_->log_initial_global_pose_graph(aggregate_pose_graph_.first, aggregate_pose_graph_.second);
   }
+
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] starting optimization factors=%zu estimates=%zu",
+      aggregate_pose_graph_.first->size(), aggregate_pose_graph_.second->size());
 
   // Optimize graph
   optimization_result_ =
@@ -883,6 +979,16 @@ void DecentralizedPGO::check_result_and_finish_optimization()
 
 void DecentralizedPGO::optimization_loop_callback()
 {
+  static int previous_state = -1;
+  if (previous_state != static_cast<int>(optimizer_state_))
+  {
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] optimizer state -> %s",
+        optimizer_state_to_string(optimizer_state_));
+    previous_state = static_cast<int>(optimizer_state_);
+  }
+
   if (!odometry_pose_estimates_->empty())
   {
     if (optimizer_state_ ==

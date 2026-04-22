@@ -37,6 +37,10 @@ class GlobalDescriptorLoopClosureDetection(object):
         self.params = params
         self.node = node
         self.lcm = LoopClosureSparseMatching(params)
+        self.received_keyframe_count = 0
+        self.computed_descriptor_count = 0
+        self.inter_detect_cycles = 0
+        self.local_intra_matches_count = 0
 
         # Place Recognition network setup
         if self.params['frontend.global_descriptor_technique'].lower(
@@ -144,6 +148,16 @@ class GlobalDescriptorLoopClosureDetection(object):
         from cv_bridge import CvBridge
 
         self.gpu_start_time = time.time() 
+
+        self.node.get_logger().info(
+            "[DEBUG_LC_PIPELINE] GLCD ready "
+            f"ns={self.node.get_namespace()} "
+            f"robot_id={self.params['robot_id']} "
+            f"keyframe_type={self.keyframe_type} "
+            f"global_descriptor_topic={self.params['frontend.global_descriptors_topic']} "
+            f"inter_robot_matches_topic={self.params['frontend.inter_robot_matches_topic']} "
+            "keyframe_input_topic=cslam/keyframe_data"
+        )
 
     def add_global_descriptor_to_map(self, embedding, kf_id):
         """ Add global descriptor to matching list
@@ -305,6 +319,12 @@ class GlobalDescriptorLoopClosureDetection(object):
                 msg.keyframe0_id = kf_id
                 msg.keyframe1_id = kf_match
                 self.local_match_publisher.publish(msg)
+                self.local_intra_matches_count += 1
+                self.node.get_logger().info(
+                    "[DEBUG_LC_PIPELINE] intra-loop candidate "
+                    f"from={kf_id} to={kf_match} "
+                    f"total_intra_matches={self.local_intra_matches_count}"
+                )
 
     def detect_inter(self):
         """ Detect inter-robot loop closures
@@ -312,8 +332,16 @@ class GlobalDescriptorLoopClosureDetection(object):
         Returns:
             list(int): selected keyframes from other robots to match
         """
+        self.inter_detect_cycles += 1
         neighbors_is_in_range, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range(
         )
+        if self.inter_detect_cycles <= 5 or self.inter_detect_cycles % 20 == 0:
+            self.node.get_logger().info(
+                "[DEBUG_LC_PIPELINE] detect_inter cycle "
+                f"count={self.inter_detect_cycles} "
+                f"neighbors={neighbors_in_range_list} "
+                f"is_broker={self.neighbor_manager.local_robot_is_broker()}"
+            )
         #self.node.get_logger().info('Neighbors in range: ' +  str(neighbors_in_range_list))
         # Check if the robot is the broker
         if len(neighbors_in_range_list
@@ -323,6 +351,11 @@ class GlobalDescriptorLoopClosureDetection(object):
             selection = self.lcm.select_candidates(
                 self.params["frontend.inter_robot_loop_closure_budget"],
                 neighbors_is_in_range)
+            if len(selection) > 0:
+                self.node.get_logger().info(
+                    "[DEBUG_LC_PIPELINE] inter-loop candidates selected "
+                    f"count={len(selection)}"
+                )
             
             # Extract and publish local descriptors
             vertices_info = self.edge_list_to_vertices(selection)
@@ -391,6 +424,19 @@ class GlobalDescriptorLoopClosureDetection(object):
         Args:
             msg (cslam_common_interfaces::msg::KeyframeRGB or KeyframePointCloud): Keyframe data
         """
+        self.received_keyframe_count += 1
+        if self.keyframe_type == "pointcloud":
+            points_count = msg.pointcloud.width * msg.pointcloud.height
+        else:
+            points_count = 0
+        if self.received_keyframe_count <= 5 or self.received_keyframe_count % 50 == 0:
+            self.node.get_logger().info(
+                "[DEBUG_LC_PIPELINE] keyframe received "
+                f"count={self.received_keyframe_count} "
+                f"id={msg.id} "
+                f"points={points_count}"
+            )
+
         # Place recognition descriptor processing
         embedding = []
         if self.keyframe_type == "rgb":
@@ -401,6 +447,15 @@ class GlobalDescriptorLoopClosureDetection(object):
         elif self.keyframe_type == "pointcloud":
             embedding = self.global_descriptor.compute_embedding(
                 icp_utils.ros_pointcloud_to_points(msg.pointcloud))
+
+        self.computed_descriptor_count += 1
+        if self.computed_descriptor_count <= 5 or self.computed_descriptor_count % 50 == 0:
+            self.node.get_logger().info(
+                "[DEBUG_LC_PIPELINE] descriptor computed "
+                f"count={self.computed_descriptor_count} "
+                f"id={msg.id} "
+                f"dim={len(embedding)}"
+            )
 
         self.add_global_descriptor_to_map(embedding, msg.id)
 
