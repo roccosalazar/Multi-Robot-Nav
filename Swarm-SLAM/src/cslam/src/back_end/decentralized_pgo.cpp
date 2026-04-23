@@ -134,7 +134,7 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
       "cslam/optimized_estimates", 100,
       std::bind(&DecentralizedPGO::optimized_estimates_callback, this,
                 std::placeholders::_1));
-
+  // "/r" + std::to_string(robot_id_) + "/cslam/optimized_estimates" BUG? 
   optimized_pose_estimate_publisher_ = node->create_publisher<
                 geometry_msgs::msg::PoseStamped>(
                 "/r" + std::to_string(robot_id_) + "/cslam/current_pose_estimate", 100);
