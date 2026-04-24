@@ -1,11 +1,11 @@
-# Single-robot configuration for aramis (scan-matching only)
+# Single-robot configuration for r0 (scan-matching only)
 
 /**:
   ros__parameters:
-    model_namespace: "aramis"
+    model_namespace: "r0"
     # Use global TF topics
     tf_topics_in_model_namespace: false
-    # Keep frame ids prefixed (aramis/base_link, aramis/odom, ...)
+    # Keep frame ids prefixed (r0/base_link, r0/odom, ...)
     prefix_frames_with_model_namespace: true
     use_sim_time: true
     points_topic: "sensors/lidar3d_0/points"
@@ -97,8 +97,8 @@ floor_detection_component:
 mrg_slam_component:
   ros__parameters:
     enable_mrg_slam: false
-    own_name: "aramis"
-    multi_robot_names: ["aramis"]
+    own_name: "r0"
+    multi_robot_names: ["r0"]
     robot_remove_points_radius: 2.0
     x: 0.0
     y: 0.0

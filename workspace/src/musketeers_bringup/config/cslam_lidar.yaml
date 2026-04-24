@@ -3,7 +3,7 @@
     frontend:
       odom_topic: "scan_matching_odometry/odom"
       sensor_type: "lidar"
-      pointcloud_topic: "sensors/lidar3d_0/points"
+      pointcloud_topic: "scan_matching_odometry/aligned_points"
       voxel_size: 0.5
       registration_min_inliers: 60
       inter_robot_loop_closure_budget: 1
@@ -17,7 +17,7 @@
       detection_publication_max_elems_per_msg: 100
       enable_intra_robot_loop_closures: true
       keyframe_generation_ratio_distance: 0.5
-      pointcloud_odom_approx_time_sync_s: 0.5
+      pointcloud_odom_approx_time_sync_s: 0.1
       use_vertex_cover_selection: true
       map_manager_process_period_ms: 100
       global_descriptor_technique: "scancontext"
