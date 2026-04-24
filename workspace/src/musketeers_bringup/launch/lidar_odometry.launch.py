@@ -7,7 +7,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot namespace.'),
+    DeclareLaunchArgument('robot_name', default_value='r0', description='Robot namespace.'),
     DeclareLaunchArgument('config', default_value='scanmatching.yaml', description='mrg_slam config file name.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
 ]
