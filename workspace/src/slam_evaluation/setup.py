@@ -30,6 +30,7 @@ setup(
             'cslam_odom_tf_bridge = slam_evaluation.cslam_odom_tf_bridge:main',
             'cslam_keyframe_cloud_viewer = slam_evaluation.cslam_keyframe_cloud_viewer:main',
             'slam_pose_publisher = slam_evaluation.slam_pose_publisher:main',
+            'cslam_pose_graph_rviz = slam_evaluation.cslam_pose_graph_rviz:main',
         ],
     },
 )
