@@ -7,7 +7,6 @@ system:
   ros2:
     namespace: aramis
 platform:
-  wheel: track
   color: dark_olive
   extras:
     urdf:
