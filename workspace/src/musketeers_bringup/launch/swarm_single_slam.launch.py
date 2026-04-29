@@ -1,0 +1,321 @@
+from ament_index_python.packages import get_package_share_directory
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
+from launch.conditions import IfCondition
+from launch.launch_context import LaunchContext
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+
+
+ARGUMENTS = [
+    DeclareLaunchArgument(
+        'robot_name',
+        default_value='r0',
+        description='Robot namespace used for odometry and CSLAM nodes.',
+    ),
+    DeclareLaunchArgument('robot_id', default_value='0', description='Robot numeric identifier.'),
+    DeclareLaunchArgument('max_nb_robots', default_value='1', description='Total number of robots.'),
+    DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Use simulation clock for all nodes in this pipeline.',
+    ),
+    DeclareLaunchArgument(
+        'config_path',
+        default_value=PathJoinSubstitution([
+            get_package_share_directory('musketeers_bringup'),
+            'config',
+        ]),
+        description='Directory containing the CSLAM YAML config file.',
+    ),
+    DeclareLaunchArgument(
+        'config_file',
+        default_value='cslam_lidar.yaml',
+        description='CSLAM YAML config file name.',
+    ),
+    DeclareLaunchArgument(
+        'lidar_odometry_config',
+        default_value='scanmatching.yaml',
+        description='mrg_slam config file name used by mrg_slam_v2.launch.py.',
+    ),
+    DeclareLaunchArgument(
+        'launch_prefix_cslam',
+        default_value='',
+        description='Optional debug prefix for core CSLAM nodes.',
+    ),
+    DeclareLaunchArgument(
+        'enable_simulated_rendezvous',
+        default_value='false',
+        description='Enable simulated rendezvous evaluation mode.',
+    ),
+    DeclareLaunchArgument(
+        'rendezvous_schedule_file',
+        default_value='',
+        description='Path to the rendezvous schedule file.',
+    ),
+    DeclareLaunchArgument('log_level', default_value='info', description='ROS log level for CSLAM nodes.'),
+    DeclareLaunchArgument(
+        'start_graph_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start the pose graph viewer.',
+    ),
+    DeclareLaunchArgument(
+        'start_cloud_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start the keyframe cloud viewer.',
+    ),
+    DeclareLaunchArgument(
+        'swarm_slam_delay_sec',
+        default_value='2.0',
+        description='Delay before starting the core CSLAM nodes.',
+    ),
+    DeclareLaunchArgument(
+        'pose_graph_viewer_delay_sec',
+        default_value='4.0',
+        description='Delay before starting the pose graph viewer.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_viewer_delay_sec',
+        default_value='5.0',
+        description='Delay before starting the keyframe cloud viewer.',
+    ),
+    DeclareLaunchArgument(
+        'pose_graph_viewer_input_topic',
+        default_value='/cslam/viz/pose_graph',
+        description='Input PoseGraph topic for cslam_pose_graph_viewer.launch.py.',
+    ),
+    DeclareLaunchArgument(
+        'pose_graph_viewer_output_topic',
+        default_value='/cslam_rviz/pose_graph_markers',
+        description='Output MarkerArray topic for the pose graph viewer.',
+    ),
+    DeclareLaunchArgument(
+        'pose_graph_viewer_node_scale',
+        default_value='0.30',
+        description='Sphere diameter for pose-graph nodes [m].',
+    ),
+    DeclareLaunchArgument(
+        'pose_graph_viewer_edge_width',
+        default_value='0.05',
+        description='Line width for pose-graph edges [m].',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_pose_graph_topic',
+        default_value='/cslam/viz/pose_graph',
+        description='Pose graph topic consumed by cslam_keyframe_cloud_viewer.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_topic',
+        default_value='/cslam/viz/keyframe_pointcloud',
+        description='Keyframe point cloud topic consumed by cslam_keyframe_cloud_viewer.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_odom_topic',
+        default_value=['/', LaunchConfiguration('robot_name'), '/cslam/keyframe_odom'],
+        description='Keyframe odometry topic consumed by cslam_keyframe_cloud_viewer.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_output_topic',
+        default_value='/cslam_rviz/keyframe_cloud_markers',
+        description='Output MarkerArray topic for the keyframe cloud viewer.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_point_scale',
+        default_value='0.08',
+        description='Marker point size for the keyframe cloud viewer [m].',
+    ),
+    DeclareLaunchArgument(
+        'max_points_per_keyframe',
+        default_value='0',
+        description='Maximum rendered points per keyframe. Use 0 to disable downsampling.',
+    ),
+]
+
+
+def _create_lidar_odometry_action() -> IncludeLaunchDescription:
+    """
+    Create the external mrg_slam launch include used for scan-matching odometry.
+    The returned action starts mrg_slam_v2.launch.py with the robot namespace and config.
+    """
+    pkg_mrg_slam = get_package_share_directory('mrg_slam')
+    mrg_slam_launch = PathJoinSubstitution([pkg_mrg_slam, 'launch', 'mrg_slam_v2.launch.py'])
+
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(mrg_slam_launch),
+        launch_arguments={
+            'config': LaunchConfiguration('lidar_odometry_config'),
+            'model_namespace': LaunchConfiguration('robot_name'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'enable_map2odom_publisher': 'false',
+        }.items(),
+    )
+
+
+def _create_cslam_nodes() -> list[Node]:
+    """
+    Create the core CSLAM nodes that were previously inside swarm_slam_bringup.launch.py.
+    The returned list contains loop closure detection, map manager, pose graph manager and TF bridge.
+    """
+    config = PathJoinSubstitution([
+        LaunchConfiguration('config_path'),
+        LaunchConfiguration('config_file'),
+    ])
+    namespace = LaunchConfiguration('robot_name')
+    common_params = {
+        'robot_id': LaunchConfiguration('robot_id'),
+        'max_nb_robots': LaunchConfiguration('max_nb_robots'),
+        'use_sim_time': LaunchConfiguration('use_sim_time'),
+    }
+    log_args = ['--ros-args', '--log-level', LaunchConfiguration('log_level')]
+
+    loop_detection_node = Node(
+        package='cslam',
+        executable='loop_closure_detection_node.py',
+        name='cslam_loop_closure_detection',
+        parameters=[config, common_params],
+        namespace=namespace,
+        arguments=log_args,
+    )
+
+    map_manager_node = Node(
+        package='cslam',
+        executable='lidar_handler_node.py',
+        name='cslam_map_manager',
+        parameters=[config, common_params],
+        prefix=LaunchConfiguration('launch_prefix_cslam'),
+        namespace=namespace,
+        arguments=log_args,
+    )
+
+    pose_graph_manager_node = Node(
+        package='cslam',
+        executable='pose_graph_manager',
+        name='cslam_pose_graph_manager',
+        parameters=[
+            config,
+            common_params,
+            {
+                'evaluation.enable_simulated_rendezvous': LaunchConfiguration('enable_simulated_rendezvous'),
+                'evaluation.rendezvous_schedule_file': LaunchConfiguration('rendezvous_schedule_file'),
+            },
+        ],
+        prefix=LaunchConfiguration('launch_prefix_cslam'),
+        namespace=namespace,
+        arguments=log_args,
+    )
+
+    cslam_tf_bridge_node = Node(
+        package='slam_evaluation',
+        executable='cslam_odom_tf_bridge',
+        name='cslam_odom_tf_bridge',
+        namespace=namespace,
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'cslam_pose_topic': 'cslam/current_pose_estimate',
+                'odom_topic': 'scan_matching_odometry/odom',
+                'max_anchor_time_diff_sec': 2.0,
+            }
+        ],
+        arguments=log_args,
+    )
+
+    return [
+        loop_detection_node,
+        map_manager_node,
+        pose_graph_manager_node,
+        cslam_tf_bridge_node,
+    ]
+
+
+def _delayed_cslam_nodes_action(context: LaunchContext) -> list[TimerAction]:
+    """
+    Create a delayed action for the core CSLAM nodes.
+    The delay preserves the startup ordering previously used by single_cslam.launch.py.
+    """
+    delay_sec = float(context.perform_substitution(LaunchConfiguration('swarm_slam_delay_sec')))
+    return [TimerAction(period=delay_sec, actions=_create_cslam_nodes())]
+
+
+def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluation: str) -> list[TimerAction]:
+    """
+    Create a delayed action for the pose graph viewer launch.
+    The returned action starts the external cslam_pose_graph_viewer.launch.py when enabled.
+    """
+    cslam_pose_graph_viewer_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'cslam_pose_graph_viewer.launch.py'])
+        ),
+        launch_arguments={
+            'use_sim_time': context.perform_substitution(LaunchConfiguration('use_sim_time')),
+            'input_topic': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_input_topic')),
+            'output_topic': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_output_topic')),
+            'node_scale': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_node_scale')),
+            'edge_width': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_edge_width')),
+        }.items(),
+    )
+
+    delay_sec = float(context.perform_substitution(LaunchConfiguration('pose_graph_viewer_delay_sec')))
+    return [
+        TimerAction(
+            period=delay_sec,
+            actions=[cslam_pose_graph_viewer_launch],
+            condition=IfCondition(LaunchConfiguration('start_graph_viewer')),
+        )
+    ]
+
+
+def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerAction]:
+    """
+    Create a delayed action for the keyframe cloud viewer node.
+    The returned action starts the viewer node when cloud visualization is enabled.
+    """
+    cslam_keyframe_cloud_viewer_node = Node(
+        package='slam_evaluation',
+        executable='cslam_keyframe_cloud_viewer',
+        name='cslam_keyframe_cloud_viewer',
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': context.perform_substitution(LaunchConfiguration('use_sim_time')),
+                'pose_graph_topic': context.perform_substitution(LaunchConfiguration('keyframe_pose_graph_topic')),
+                'keyframe_cloud_topic': context.perform_substitution(LaunchConfiguration('keyframe_cloud_topic')),
+                'keyframe_odom_topic': context.perform_substitution(LaunchConfiguration('keyframe_odom_topic')),
+                'output_topic': context.perform_substitution(LaunchConfiguration('keyframe_cloud_output_topic')),
+                'point_scale': context.perform_substitution(LaunchConfiguration('keyframe_point_scale')),
+                'max_points_per_keyframe': context.perform_substitution(LaunchConfiguration('max_points_per_keyframe')),
+            }
+        ],
+    )
+
+    delay_sec = float(context.perform_substitution(LaunchConfiguration('keyframe_cloud_viewer_delay_sec')))
+    return [
+        TimerAction(
+            period=delay_sec,
+            actions=[cslam_keyframe_cloud_viewer_node],
+            condition=IfCondition(LaunchConfiguration('start_cloud_viewer')),
+        )
+    ]
+
+
+def generate_launch_description() -> LaunchDescription:
+    """
+    Generate a single flattened launch description for one CSLAM robot.
+    It starts external mrg_slam odometry, direct CSLAM nodes and visualization tools.
+    """
+    pkg_slam_evaluation = get_package_share_directory('slam_evaluation')
+
+    launch_description = LaunchDescription(ARGUMENTS)
+    launch_description.add_action(_create_lidar_odometry_action())
+    launch_description.add_action(OpaqueFunction(function=_delayed_cslam_nodes_action))
+    launch_description.add_action(
+        OpaqueFunction(function=_delayed_pose_graph_viewer_action, args=[pkg_slam_evaluation])
+    )
+    launch_description.add_action(OpaqueFunction(function=_delayed_keyframe_cloud_viewer_action))
+    return launch_description
