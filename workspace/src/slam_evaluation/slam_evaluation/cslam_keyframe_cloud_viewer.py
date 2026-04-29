@@ -135,7 +135,7 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("keyframe_cloud_topic", "/cslam/viz/keyframe_pointcloud")
         self.declare_parameter("keyframe_odom_topic", "/r0/cslam/keyframe_odom")
         self.declare_parameter("output_topic", "/cslam_rviz/keyframe_cloud_markers")
-        self.declare_parameter("point_scale", 0.08)
+        self.declare_parameter("point_scale", 0.001)
         self.declare_parameter("max_points_per_keyframe", 0)
 
         self.pose_graph_topic = self.get_parameter("pose_graph_topic").get_parameter_value().string_value
@@ -227,12 +227,12 @@ class CslamKeyframeCloudViewer(Node):
         marker.header.frame_id = self.global_frame_id if self.global_frame_id else ""
         marker.ns = f"robot_{robot_id}"
         marker.id = int(keyframe_id)
-        marker.type = Marker.POINTS
+        marker.type = Marker.SPHERE_LIST
         marker.action = Marker.ADD
         marker.pose.orientation.w = 1.0
         marker.scale.x = self.point_scale
         marker.scale.y = self.point_scale
-        marker.scale.z = 0.0
+        marker.scale.z = self.point_scale
         marker.color = self._color_for_robot(robot_id)
         marker.frame_locked = False
         marker.points = [
