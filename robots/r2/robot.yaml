@@ -1,11 +1,11 @@
-serial_number: w200-0005
+serial_number: w200-0007
 version: 0
 system:
   hosts:
-    - hostname: cpr-w200-0005
+    - hostname: cpr-w200-0007
       ip: 192.168.131.1
   ros2:
-    namespace: r0
+    namespace: r2
 platform:
   color: dark_olive
   extras:

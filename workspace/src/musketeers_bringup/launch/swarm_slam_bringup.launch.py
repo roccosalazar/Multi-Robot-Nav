@@ -102,8 +102,26 @@ def generate_launch_description() -> LaunchDescription:
         arguments=log_args,
     )
 
+    cslam_tf_bridge_node = Node(
+        package='slam_evaluation',
+        executable='cslam_odom_tf_bridge',
+        name='cslam_odom_tf_bridge',
+        namespace=namespace,
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'cslam_pose_topic': 'cslam/current_pose_estimate',
+                'odom_topic': 'scan_matching_odometry/odom',
+                'max_anchor_time_diff_sec': 2.0,
+            }
+        ],
+        arguments=log_args,
+    )
+
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(loop_detection_node)
     ld.add_action(map_manager_node)
     ld.add_action(pose_graph_manager_node)
+    ld.add_action(cslam_tf_bridge_node)
     return ld

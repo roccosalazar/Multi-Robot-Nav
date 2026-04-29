@@ -27,6 +27,8 @@ setup(
     entry_points={
         'console_scripts': [
             'ground_truth_pose_extractor = slam_evaluation.ground_truth_pose_extractor:main',
+            'cslam_odom_tf_bridge = slam_evaluation.cslam_odom_tf_bridge:main',
+            'cslam_keyframe_cloud_viewer = slam_evaluation.cslam_keyframe_cloud_viewer:main',
             'slam_pose_publisher = slam_evaluation.slam_pose_publisher:main',
         ],
     },
