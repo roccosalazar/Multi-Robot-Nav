@@ -136,7 +136,7 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("keyframe_odom_topic", "/r0/cslam/keyframe_odom")
         self.declare_parameter("output_topic", "/cslam_rviz/keyframe_cloud_markers")
         self.declare_parameter("point_scale", 0.001)
-        self.declare_parameter("max_points_per_keyframe", 0)
+        self.declare_parameter("max_points_per_keyframe", 1000)
 
         self.pose_graph_topic = self.get_parameter("pose_graph_topic").get_parameter_value().string_value
         self.keyframe_cloud_topic = self.get_parameter("keyframe_cloud_topic").get_parameter_value().string_value

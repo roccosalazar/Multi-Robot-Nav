@@ -44,7 +44,7 @@ def _slam_instance(slam_bringup_launch: PathJoinSubstitution, robot_name: str, x
 
 def generate_launch_description() -> LaunchDescription:
     pkg_musketeers_bringup = get_package_share_directory('musketeers_bringup')
-    slam_bringup_launch = PathJoinSubstitution([pkg_musketeers_bringup, 'launch', 'slam_bringup.launch.py'])
+    slam_bringup_launch = PathJoinSubstitution([pkg_musketeers_bringup, 'launch', 'mrg_single_slam.launch.py'])
 
     aramis_slam = _slam_instance(slam_bringup_launch, 'aramis', '-3.0', '0.0', '0.0')
     athos_slam = _slam_instance(slam_bringup_launch, 'athos', '0.0', '0.0', '0.0')
