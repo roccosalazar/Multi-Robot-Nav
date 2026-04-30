@@ -1,2 +1,0 @@
-Publishers [Address, Message Type]:
-  tcp://172.17.0.1:44247, ignition.msgs.WorldStatistics
