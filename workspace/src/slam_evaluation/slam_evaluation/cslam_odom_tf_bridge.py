@@ -101,6 +101,7 @@ class CslamOdomTfBridge(Node):
         self.declare_parameter("max_anchor_time_diff_sec", 2.0)
         self.declare_parameter("odom_buffer_size", 200)
         self.declare_parameter("publish_on_odom", True)
+        self.declare_parameter("initialize_anchor_from_first_pose", True)
 
         self.cslam_pose_topic = self.get_parameter("cslam_pose_topic").get_parameter_value().string_value
         self.optimizer_state_topic = (
@@ -110,6 +111,9 @@ class CslamOdomTfBridge(Node):
         self.max_anchor_time_diff = float(self.get_parameter("max_anchor_time_diff_sec").value)
         self.odom_buffer_size = int(self.get_parameter("odom_buffer_size").value)
         self.publish_on_odom = bool(self.get_parameter("publish_on_odom").value)
+        self.initialize_anchor_from_first_pose = bool(
+            self.get_parameter("initialize_anchor_from_first_pose").value
+        )
 
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -141,7 +145,8 @@ class CslamOdomTfBridge(Node):
             f"optimizer_state_topic='{self.optimizer_state_topic}', "
             f"odom_topic='{self.odom_topic}', "
             f"max_anchor_time_diff_sec={self.max_anchor_time_diff:.3f}, "
-            f"odom_buffer_size={self.odom_buffer_size}"
+            f"odom_buffer_size={self.odom_buffer_size}, "
+            f"initialize_anchor_from_first_pose={self.initialize_anchor_from_first_pose}"
         )
 
     def _stamp_to_time(self, stamp) -> Time:
@@ -259,6 +264,17 @@ class CslamOdomTfBridge(Node):
     def _cslam_pose_callback(self, msg: PoseStamped) -> None:
         if self.pending_anchor_update:
             self._compute_anchor_from_pose(msg)
+            return
+
+        if (
+            self.initialize_anchor_from_first_pose
+            and self.map_to_odom_translation is None
+            and self.map_to_odom_rotation is None
+        ):
+            if self._compute_anchor_from_pose(msg):
+                self.get_logger().info(
+                    "Initialized map->odom anchor from first CSLAM pose sample."
+                )
 
     def _optimizer_state_callback(self, msg: OptimizerState) -> None:
         previous_state = self.previous_optimizer_state

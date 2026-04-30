@@ -7,7 +7,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('config', default_value='swarm_slam.yaml', description='mrg_slam config file name.'),
+    DeclareLaunchArgument('config', default_value='swarm_team.yaml', description='mrg_slam config file name.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
     DeclareLaunchArgument('world', default_value='warehouse', description='World frame id used for published SLAM pose.'),
     DeclareLaunchArgument('slam_pose_offset_x', default_value='0.0', description='Output SLAM pose x offset [m].'),

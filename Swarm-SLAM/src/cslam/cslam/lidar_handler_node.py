@@ -53,7 +53,18 @@ class LidarHandler:
         )
         self.tss.registerCallback(self.lidar_callback)
 
-        self.keyframe_odom_publisher = self.node.create_publisher(KeyframeOdom, "cslam/keyframe_odom", 100)
+        keyframe_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=100,
+        )
+
+        self.keyframe_odom_publisher = self.node.create_publisher(
+            KeyframeOdom,
+            "cslam/keyframe_odom",
+            keyframe_qos,
+        )
 
         self.keyframe_pointcloud_publisher = self.node.create_publisher(KeyframePointCloud, "cslam/keyframe_data", 100)
 

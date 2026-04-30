@@ -309,6 +309,8 @@ namespace cslam
         gtsam::Pose3 latest_local_pose_, local_pose_at_latest_optimization_,
             tentative_local_pose_at_latest_optimization_, latest_optimized_pose_;
         gtsam::LabeledSymbol latest_local_symbol_;
+        gtsam::LabeledSymbol anchor_symbol_;
+        bool warned_missing_initial_keyframe_;
 
         bool enable_pose_timestamps_recording_;
 

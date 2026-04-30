@@ -1,5 +1,7 @@
 #include "cslam/back_end/decentralized_pgo.h"
 
+#include <sstream>
+
 #define MAP_FRAME_ID(id) "robot" + std::to_string(id) + "_map"
 #define CURRENT_FRAME_ID(id) "robot" + std::to_string(id) + "_current_pose"
 #define LATEST_OPTIMIZED_FRAME_ID(id) "robot" + std::to_string(id) + "_latest_optimized_pose"
@@ -26,6 +28,58 @@ const char *optimizer_state_to_string(OptimizerState state)
     default:
       return "UNKNOWN";
   }
+}
+
+std::string join_ids(const std::vector<unsigned int> &ids)
+{
+  std::ostringstream oss;
+  oss << "[";
+  for (size_t i = 0; i < ids.size(); ++i)
+  {
+    if (i > 0)
+    {
+      oss << ", ";
+    }
+    oss << ids[i];
+  }
+  oss << "]";
+  return oss.str();
+}
+
+std::string join_id_set(const std::set<unsigned int> &ids)
+{
+  std::ostringstream oss;
+  oss << "[";
+  size_t i = 0;
+  for (auto id : ids)
+  {
+    if (i > 0)
+    {
+      oss << ", ";
+    }
+    oss << id;
+    ++i;
+  }
+  oss << "]";
+  return oss.str();
+}
+
+std::string join_connectivity_map(const std::map<unsigned int, bool> &is_connected)
+{
+  std::ostringstream oss;
+  oss << "{";
+  size_t i = 0;
+  for (const auto &entry : is_connected)
+  {
+    if (i > 0)
+    {
+      oss << ", ";
+    }
+    oss << entry.first << ":" << (entry.second ? "true" : "false");
+    ++i;
+  }
+  oss << "}";
+  return oss.str();
 }
 } // namespace
 
@@ -60,9 +114,13 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
   node_->get_parameter("backend.max_waiting_time_sec", max_waiting_param);
   max_waiting_time_sec_ = rclcpp::Duration(max_waiting_param, 0);
 
+  anchor_symbol_ = gtsam::LabeledSymbol();
+  warned_missing_initial_keyframe_ = false;
+
   odometry_subscriber_ =
       node->create_subscription<cslam_common_interfaces::msg::KeyframeOdom>(
-          "cslam/keyframe_odom", 1000,
+          "cslam/keyframe_odom",
+          rclcpp::QoS(rclcpp::KeepLast(100)).reliable().transient_local(),
           std::bind(&DecentralizedPGO::odometry_callback, this,
                     std::placeholders::_1));
 
@@ -284,7 +342,20 @@ void DecentralizedPGO::odometry_callback(
   }
 
   odometry_pose_estimates_->insert(symbol, current_estimate);
-  if (msg->id == 0)
+  if (anchor_symbol_ == gtsam::LabeledSymbol())
+  {
+    anchor_symbol_ = symbol;
+    current_pose_estimates_->insert(symbol, current_estimate);
+    if (msg->id != 0 && !warned_missing_initial_keyframe_)
+    {
+      RCLCPP_WARN(
+          node_->get_logger(),
+          "[DEBUG_BACKEND_PIPELINE] Missing keyframe id=0, initializing graph from first received keyframe id=%u.",
+          msg->id);
+      warned_missing_initial_keyframe_ = true;
+    }
+  }
+  else if (msg->id == 0)
   {
     current_pose_estimates_->insert(symbol, current_estimate);
   }
@@ -363,6 +434,18 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
     {
       connected_robots_.insert(msg->robot0_id);
     }
+
+    const auto pair_key =
+        std::make_pair(std::min(msg->robot0_id, msg->robot1_id),
+                       std::max(msg->robot0_id, msg->robot1_id));
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] inter_robot_loop_closure accepted pair=(%u,%u) "
+        "kf0=%u kf1=%u pair_count=%zu local_connected=%s",
+        msg->robot0_id, msg->robot1_id, msg->robot0_keyframe_id,
+        msg->robot1_keyframe_id,
+        inter_robot_loop_closures_[pair_key].size(),
+        join_id_set(connected_robots_).c_str());
   }
 }
 
@@ -381,7 +464,8 @@ void DecentralizedPGO::current_neighbors_callback(
 {
   current_neighbors_ids_ = *msg;
   end_waiting();
-  if (is_optimizer())
+  const bool local_is_optimizer = is_optimizer();
+  if (local_is_optimizer)
   {
     optimizer_state_ = OptimizerState::POSEGRAPH_COLLECTION;
   }
@@ -389,6 +473,14 @@ void DecentralizedPGO::current_neighbors_callback(
   {
     optimizer_state_ = OptimizerState::IDLE;
   }
+
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] neighbors update robots=%s origins=%s is_optimizer=%s odom_values=%zu",
+      join_ids(current_neighbors_ids_.robots.ids).c_str(),
+      join_ids(current_neighbors_ids_.origins.ids).c_str(),
+      local_is_optimizer ? "true" : "false",
+      odometry_pose_estimates_->size());
 }
 
 bool DecentralizedPGO::is_optimizer()
@@ -493,6 +585,13 @@ void DecentralizedPGO::pose_graph_callback(
     received_pose_graphs_[msg->robot_id] = true;
     received_pose_graphs_connectivity_.insert(
         {msg->robot_id, msg->connected_robots.ids});
+
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] pose_graph received from=%u values=%zu edges=%zu connected_robots=%s all_received=%s",
+        msg->robot_id, msg->values.size(), msg->edges.size(),
+        join_ids(msg->connected_robots.ids).c_str(),
+        check_received_pose_graphs() ? "true" : "false");
       
     if (enable_logs_){
       logger_->add_pose_graph_log_info(*msg);
@@ -525,9 +624,12 @@ std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
   }
 
   // Breadth First Search
-  bool *visited = new bool[current_neighbors_ids_.robots.ids.size()];
-  for (unsigned int i = 0; i < current_neighbors_ids_.robots.ids.size(); i++)
-    visited[i] = false;
+  std::map<unsigned int, bool> visited;
+  visited[robot_id_] = false;
+  for (auto id : current_neighbors_ids_.robots.ids)
+  {
+    visited[id] = false;
+  }
 
   std::list<unsigned int> queue;
 
@@ -551,6 +653,13 @@ std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
       }
     }
   }
+
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] pose_graph connectivity local_connected=%s result=%s",
+      join_id_set(connected_robots_).c_str(),
+      join_connectivity_map(is_robot_connected).c_str());
+
   return is_robot_connected;
 }
 
@@ -615,12 +724,16 @@ DecentralizedPGO::aggregate_pose_graphs()
   graph->push_back(pose_graph_->begin(), pose_graph_->end());
   estimates->insert(*odometry_pose_estimates_);
   tentative_local_pose_at_latest_optimization_ = latest_local_pose_;
+  size_t inserted_remote_values = 0;
+  size_t inserted_inter_robot_loop_closures = 0;
+  size_t inserted_remote_factors = 0;
 
   // Add other robots graphs
   for (auto id : current_neighbors_ids_.robots.ids)
   {
     if (is_pose_graph_connected[id])
     {
+      inserted_remote_values += other_robots_graph_and_estimates_[id].second->size();
       estimates->insert(*other_robots_graph_and_estimates_[id].second);
     }
   }
@@ -650,6 +763,7 @@ DecentralizedPGO::aggregate_pose_graphs()
           {
             graph->push_back(factor);
             added_loop_closures.insert({factor.key1(), factor.key2()});
+            inserted_inter_robot_loop_closures++;
           }
         }
       }
@@ -677,10 +791,24 @@ DecentralizedPGO::aggregate_pose_graphs()
         {
           graph->push_back(factor);
           added_loop_closures.insert({factor->key1(), factor->key2()});
+          inserted_remote_factors++;
         }
       }
     }
   }
+
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] aggregate_pose_graphs connected=%s local_values=%zu remote_values=%zu "
+      "total_estimates=%zu local_factors=%zu remote_factors=%zu inter_robot_factors=%zu total_factors=%zu",
+      join_connectivity_map(is_pose_graph_connected).c_str(),
+      odometry_pose_estimates_->size(),
+      inserted_remote_values,
+      estimates->size(),
+      pose_graph_->size(),
+      inserted_remote_factors,
+      inserted_inter_robot_loop_closures,
+      graph->size());
   return {graph, estimates};
 }
 
@@ -697,12 +825,12 @@ void DecentralizedPGO::optimized_estimates_callback(
   {
     current_pose_estimates_ = values_msg_to_gtsam(msg->estimates);
     origin_robot_id_ = msg->origin_robot_id;
-    gtsam::LabeledSymbol first_symbol(GRAPH_LABEL, ROBOT_LABEL(robot_id_), 0);
 
     gtsam::Pose3 first_pose;
-    if (current_pose_estimates_->exists(first_symbol))
+    if (anchor_symbol_ != gtsam::LabeledSymbol() &&
+        current_pose_estimates_->exists(anchor_symbol_))
     {
-      first_pose = current_pose_estimates_->at<gtsam::Pose3>(first_symbol);
+      first_pose = current_pose_estimates_->at<gtsam::Pose3>(anchor_symbol_);
     }
     update_transform_to_origin(first_pose);
 
@@ -740,11 +868,17 @@ void DecentralizedPGO::share_optimized_estimates(
     cslam_common_interfaces::msg::OptimizationResult msg;
     msg.success = true;
     msg.origin_robot_id = origin_robot_id_;
-    msg.estimates =
-        gtsam_values_to_msg(estimates.filter(gtsam::LabeledSymbol::LabelTest(
-            ROBOT_LABEL(included_robots_ids.robots.ids[i]))));
+    auto filtered_estimates =
+        estimates.filter(gtsam::LabeledSymbol::LabelTest(
+            ROBOT_LABEL(included_robots_ids.robots.ids[i])));
+    msg.estimates = gtsam_values_to_msg(filtered_estimates);
     optimized_estimates_publishers_[included_robots_ids.robots.ids[i]]->publish(
         msg);
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] share_optimized_estimates target_robot=%u origin_robot_id=%u filtered_estimates=%zu total_estimates=%zu",
+        included_robots_ids.robots.ids[i], origin_robot_id_,
+        filtered_estimates.size(), estimates.size());
   }
 }
 
@@ -919,14 +1053,17 @@ void DecentralizedPGO::start_optimization()
   aggregate_pose_graph_ = aggregate_pose_graphs();
 
   // Add prior
-  // Use first pose of current estimate
-  gtsam::LabeledSymbol first_symbol(GRAPH_LABEL, ROBOT_LABEL(robot_id_), 0);
+  // Use the initial local anchor pose. Under normal startup this is keyframe 0,
+  // but we keep a fallback when the very first message was missed.
+  gtsam::LabeledSymbol first_symbol = anchor_symbol_;
 
-  if (!current_pose_estimates_->exists(first_symbol))
+  if (first_symbol == gtsam::LabeledSymbol() ||
+      !current_pose_estimates_->exists(first_symbol))
   {
     RCLCPP_WARN(
         node_->get_logger(),
-        "[DEBUG_BACKEND_PIPELINE] optimization skipped: first symbol missing. current_values=%lu odom_values=%lu",
+        "[DEBUG_BACKEND_PIPELINE] optimization skipped: anchor symbol missing. anchor_initialized=%s current_values=%lu odom_values=%lu",
+        first_symbol == gtsam::LabeledSymbol() ? "false" : "true",
         current_pose_estimates_->size(), odometry_pose_estimates_->size());
     return;
   }
