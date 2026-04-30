@@ -137,6 +137,7 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("output_topic", "/cslam_rviz/keyframe_cloud_markers")
         self.declare_parameter("point_scale", 0.001)
         self.declare_parameter("max_points_per_keyframe", 1000)
+        self.declare_parameter("keyframe_stride", 10)
 
         self.pose_graph_topic = self.get_parameter("pose_graph_topic").get_parameter_value().string_value
         self.keyframe_cloud_topic = self.get_parameter("keyframe_cloud_topic").get_parameter_value().string_value
@@ -144,6 +145,7 @@ class CslamKeyframeCloudViewer(Node):
         self.output_topic = self.get_parameter("output_topic").get_parameter_value().string_value
         self.point_scale = float(self.get_parameter("point_scale").value)
         self.max_points_per_keyframe = int(self.get_parameter("max_points_per_keyframe").value)
+        self.keyframe_stride = max(1, int(self.get_parameter("keyframe_stride").value))
 
         self.optimized_pose_cache: Dict[Key, Pose] = {}
         self.odom_pose_cache: Dict[Key, Pose] = {}
@@ -171,7 +173,8 @@ class CslamKeyframeCloudViewer(Node):
             f"keyframe_odom_topic='{self.keyframe_odom_topic}', "
             f"output_topic='{self.output_topic}', "
             f"point_scale={self.point_scale:.3f}, "
-            f"max_points_per_keyframe={self.max_points_per_keyframe}"
+            f"max_points_per_keyframe={self.max_points_per_keyframe}, "
+            f"keyframe_stride={self.keyframe_stride}"
         )
 
     def _color_for_robot(self, robot_id: int) -> ColorRGBA:
@@ -381,6 +384,8 @@ class CslamKeyframeCloudViewer(Node):
 
     def _keyframe_cloud_callback(self, msg: VizPointCloud) -> None:
         key = (int(msg.robot_id), int(msg.keyframe_id))
+        if self.keyframe_stride > 1 and key[1] % self.keyframe_stride != 0:
+            return
         self.cloud_cache[key] = self._extract_xyz_points(msg)
         self._publish_markers()
 

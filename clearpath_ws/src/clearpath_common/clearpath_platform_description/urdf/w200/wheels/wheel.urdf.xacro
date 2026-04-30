@@ -37,8 +37,8 @@
     </joint>
     <gazebo reference="${prefix}_${side}_wheel_link">
       <selfCollide>false</selfCollide>
-      <mu1>0.5</mu1>
-      <mu2>0.5</mu2>
+      <mu1>2.0</mu1>
+      <mu2>2.0</mu2>
       <fdir1 value="1 0 0" />
       <material>Gazebo/DarkGrey</material>
     </gazebo>

@@ -49,6 +49,7 @@ ARGUMENTS = [
     DeclareLaunchArgument(
         'enable_simulated_rendezvous',
         default_value='false',
+        choices=['true', 'false'],
         description='Enable simulated rendezvous evaluation mode.',
     ),
     DeclareLaunchArgument(
@@ -134,7 +135,68 @@ ARGUMENTS = [
         default_value='0',
         description='Maximum rendered points per keyframe. Use 0 to disable downsampling.',
     ),
+    DeclareLaunchArgument(
+        'keyframe_stride',
+        default_value='10',
+        description='Render only one keyframe cloud every N keyframes. Use 1 to render all keyframes.',
+    ),
 ]
+
+
+def _get_launch_value(context: LaunchContext, name: str) -> str:
+    """
+    Resolve a launch argument to a string.
+    Args:
+        context: Current launch context.
+        name: Launch argument name.
+    Return:
+        Resolved launch argument value.
+    """
+    return context.perform_substitution(LaunchConfiguration(name))
+
+
+def _get_launch_bool(context: LaunchContext, name: str) -> bool:
+    """
+    Resolve a launch argument to a boolean.
+    Args:
+        context: Current launch context.
+        name: Launch argument name.
+    Return:
+        Boolean value parsed from the launch argument.
+    """
+    value = _get_launch_value(context, name).strip().lower()
+
+    if value in ('true', '1', 'yes', 'on'):
+        return True
+
+    if value in ('false', '0', 'no', 'off'):
+        return False
+
+    raise ValueError(f"Invalid boolean value for launch argument '{name}': {value}")
+
+
+def _get_launch_int(context: LaunchContext, name: str) -> int:
+    """
+    Resolve a launch argument to an integer.
+    Args:
+        context: Current launch context.
+        name: Launch argument name.
+    Return:
+        Integer value parsed from the launch argument.
+    """
+    return int(_get_launch_value(context, name))
+
+
+def _get_launch_float(context: LaunchContext, name: str) -> float:
+    """
+    Resolve a launch argument to a float.
+    Args:
+        context: Current launch context.
+        name: Launch argument name.
+    Return:
+        Float value parsed from the launch argument.
+    """
+    return float(_get_launch_value(context, name))
 
 
 def _create_lidar_odometry_action() -> IncludeLaunchDescription:
@@ -156,22 +218,27 @@ def _create_lidar_odometry_action() -> IncludeLaunchDescription:
     )
 
 
-def _create_cslam_nodes() -> list[Node]:
+def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
     """
     Create the core CSLAM nodes that were previously inside swarm_slam_bringup.launch.py.
     The returned list contains loop closure detection, map manager, pose graph manager and TF bridge.
     """
-    config = PathJoinSubstitution([
-        LaunchConfiguration('config_path'),
-        LaunchConfiguration('config_file'),
-    ])
-    namespace = LaunchConfiguration('robot_name')
+    config = context.perform_substitution(
+        PathJoinSubstitution([
+            LaunchConfiguration('config_path'),
+            LaunchConfiguration('config_file'),
+        ])
+    )
+
+    namespace = _get_launch_value(context, 'robot_name')
+
     common_params = {
-        'robot_id': LaunchConfiguration('robot_id'),
-        'max_nb_robots': LaunchConfiguration('max_nb_robots'),
-        'use_sim_time': LaunchConfiguration('use_sim_time'),
+        'robot_id': _get_launch_int(context, 'robot_id'),
+        'max_nb_robots': _get_launch_int(context, 'max_nb_robots'),
+        'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
     }
-    log_args = ['--ros-args', '--log-level', LaunchConfiguration('log_level')]
+
+    log_args = ['--ros-args', '--log-level', _get_launch_value(context, 'log_level')]
 
     loop_detection_node = Node(
         package='cslam',
@@ -187,7 +254,7 @@ def _create_cslam_nodes() -> list[Node]:
         executable='lidar_handler_node.py',
         name='cslam_map_manager',
         parameters=[config, common_params],
-        prefix=LaunchConfiguration('launch_prefix_cslam'),
+        prefix=_get_launch_value(context, 'launch_prefix_cslam'),
         namespace=namespace,
         arguments=log_args,
     )
@@ -200,11 +267,17 @@ def _create_cslam_nodes() -> list[Node]:
             config,
             common_params,
             {
-                'evaluation.enable_simulated_rendezvous': LaunchConfiguration('enable_simulated_rendezvous'),
-                'evaluation.rendezvous_schedule_file': LaunchConfiguration('rendezvous_schedule_file'),
+                'evaluation.enable_simulated_rendezvous': _get_launch_bool(
+                    context,
+                    'enable_simulated_rendezvous',
+                ),
+                'evaluation.rendezvous_schedule_file': _get_launch_value(
+                    context,
+                    'rendezvous_schedule_file',
+                ),
             },
         ],
-        prefix=LaunchConfiguration('launch_prefix_cslam'),
+        prefix=_get_launch_value(context, 'launch_prefix_cslam'),
         namespace=namespace,
         arguments=log_args,
     )
@@ -217,7 +290,7 @@ def _create_cslam_nodes() -> list[Node]:
         output='screen',
         parameters=[
             {
-                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
                 'cslam_pose_topic': 'cslam/current_pose_estimate',
                 'odom_topic': 'scan_matching_odometry/odom',
                 'max_anchor_time_diff_sec': 2.0,
@@ -239,8 +312,15 @@ def _delayed_cslam_nodes_action(context: LaunchContext) -> list[TimerAction]:
     Create a delayed action for the core CSLAM nodes.
     The delay preserves the startup ordering previously used by single_cslam.launch.py.
     """
-    delay_sec = float(context.perform_substitution(LaunchConfiguration('swarm_slam_delay_sec')))
-    return [TimerAction(period=delay_sec, actions=_create_cslam_nodes())]
+    delay_sec = _get_launch_float(context, 'swarm_slam_delay_sec')
+    cslam_nodes = _create_cslam_nodes(context)
+
+    return [
+        TimerAction(
+            period=delay_sec,
+            actions=cslam_nodes,
+        )
+    ]
 
 
 def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluation: str) -> list[TimerAction]:
@@ -253,15 +333,16 @@ def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluatio
             PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'cslam_pose_graph_viewer.launch.py'])
         ),
         launch_arguments={
-            'use_sim_time': context.perform_substitution(LaunchConfiguration('use_sim_time')),
-            'input_topic': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_input_topic')),
-            'output_topic': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_output_topic')),
-            'node_scale': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_node_scale')),
-            'edge_width': context.perform_substitution(LaunchConfiguration('pose_graph_viewer_edge_width')),
+            'use_sim_time': _get_launch_value(context, 'use_sim_time'),
+            'input_topic': _get_launch_value(context, 'pose_graph_viewer_input_topic'),
+            'output_topic': _get_launch_value(context, 'pose_graph_viewer_output_topic'),
+            'node_scale': _get_launch_value(context, 'pose_graph_viewer_node_scale'),
+            'edge_width': _get_launch_value(context, 'pose_graph_viewer_edge_width'),
         }.items(),
     )
 
-    delay_sec = float(context.perform_substitution(LaunchConfiguration('pose_graph_viewer_delay_sec')))
+    delay_sec = _get_launch_float(context, 'pose_graph_viewer_delay_sec')
+
     return [
         TimerAction(
             period=delay_sec,
@@ -283,18 +364,20 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
         output='screen',
         parameters=[
             {
-                'use_sim_time': context.perform_substitution(LaunchConfiguration('use_sim_time')),
-                'pose_graph_topic': context.perform_substitution(LaunchConfiguration('keyframe_pose_graph_topic')),
-                'keyframe_cloud_topic': context.perform_substitution(LaunchConfiguration('keyframe_cloud_topic')),
-                'keyframe_odom_topic': context.perform_substitution(LaunchConfiguration('keyframe_odom_topic')),
-                'output_topic': context.perform_substitution(LaunchConfiguration('keyframe_cloud_output_topic')),
-                'point_scale': context.perform_substitution(LaunchConfiguration('keyframe_point_scale')),
-                'max_points_per_keyframe': context.perform_substitution(LaunchConfiguration('max_points_per_keyframe')),
+                'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
+                'pose_graph_topic': _get_launch_value(context, 'keyframe_pose_graph_topic'),
+                'keyframe_cloud_topic': _get_launch_value(context, 'keyframe_cloud_topic'),
+                'keyframe_odom_topic': _get_launch_value(context, 'keyframe_odom_topic'),
+                'output_topic': _get_launch_value(context, 'keyframe_cloud_output_topic'),
+                'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
+                'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
+                'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),
             }
         ],
     )
 
-    delay_sec = float(context.perform_substitution(LaunchConfiguration('keyframe_cloud_viewer_delay_sec')))
+    delay_sec = _get_launch_float(context, 'keyframe_cloud_viewer_delay_sec')
+
     return [
         TimerAction(
             period=delay_sec,
@@ -318,4 +401,5 @@ def generate_launch_description() -> LaunchDescription:
         OpaqueFunction(function=_delayed_pose_graph_viewer_action, args=[pkg_slam_evaluation])
     )
     launch_description.add_action(OpaqueFunction(function=_delayed_keyframe_cloud_viewer_action))
+
     return launch_description

@@ -4,20 +4,20 @@
       odom_topic: "scan_matching_odometry/odom"
       sensor_type: "lidar"
       pointcloud_topic: "scan_matching_odometry/aligned_points"
-      voxel_size: 0.1 # da 0.5 a 0.2 Per confronto migliore con mrg slam che ha downsample_resoluton: 0.1
-      registration_min_inliers: 80
+      voxel_size: 0.1 # nuvola abbastanza fine, ma con gating piu severo a valle
+      registration_min_inliers: 120 # piu severo: TEASER++ accetta solo chiusure con supporto geometrico forte
       inter_robot_loop_closure_budget: 1
-      inter_robot_detection_period_sec: 5
+      inter_robot_detection_period_sec: 8 # meno tentativi, ma mediamente piu stabili
       enable_sparsification: true
       max_queue_size: 10
-      similarity_threshold: 0.82
+      similarity_threshold: 0.90 # il default di Swarm-SLAM e' 0.9: 0.82 tende a generare troppi falsi candidati
       global_descriptors_topic: "global_descriptors"
-      intra_loop_min_inbetween_keyframes: 15 # Da 20 a 15 
+      intra_loop_min_inbetween_keyframes: 25 # evita chiusure troppo vicine nel tempo/spazio
       detection_publication_period_sec: 0.5
       detection_publication_max_elems_per_msg: 100
       enable_intra_robot_loop_closures: true
-      keyframe_generation_ratio_distance: 1.0 # Per allinearlo a MRG-SLAM
-      pointcloud_odom_approx_time_sync_s: 0.1
+      keyframe_generation_ratio_distance: 0.6 # keyframe piu densi: descrittori e registrazione locale piu robusti
+      pointcloud_odom_approx_time_sync_s: 0.05 # associazione piu stretta tra pointcloud e odom
       use_vertex_cover_selection: true
       map_manager_process_period_ms: 20
       global_descriptor_technique: "scancontext"
