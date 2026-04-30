@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot namespace.'),
+    DeclareLaunchArgument('robot_name', default_value='r0', description='Robot namespace.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
     DeclareLaunchArgument('map_frame', default_value='map', description='Map frame for tf lookup.'),
     DeclareLaunchArgument('base_frame', default_value='base_link', description='Base frame name.'),

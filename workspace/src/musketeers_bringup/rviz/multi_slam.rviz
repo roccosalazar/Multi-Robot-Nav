@@ -50,171 +50,171 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        aramis/base_link:
+        r0/base_link:
           Value: true
-        aramis/base_plate:
+        r0/base_plate:
           Value: true
-        aramis/chassis_link:
+        r0/chassis_link:
           Value: true
-        aramis/default_mount:
+        r0/default_mount:
           Value: true
-        aramis/diff_link:
+        r0/diff_link:
           Value: true
-        aramis/front_left_wheel_link:
+        r0/front_left_wheel_link:
           Value: true
-        aramis/front_right_wheel_link:
+        r0/front_right_wheel_link:
           Value: true
-        aramis/imu_0_link:
+        r0/imu_0_link:
           Value: true
-        aramis/keyframe:
+        r0/keyframe:
           Value: true
-        aramis/left_canister_link:
+        r0/left_canister_link:
           Value: true
-        aramis/left_diff_unit_headlight_link:
+        r0/left_diff_unit_headlight_link:
           Value: true
-        aramis/left_diff_unit_link:
+        r0/left_diff_unit_link:
           Value: true
-        aramis/left_diff_unit_taillight_link:
+        r0/left_diff_unit_taillight_link:
           Value: true
-        aramis/lidar3d_0_laser:
+        r0/lidar3d_0_laser:
           Value: true
-        aramis/lidar3d_0_link:
+        r0/lidar3d_0_link:
           Value: true
-        aramis/lidar_tower:
+        r0/lidar_tower:
           Value: true
-        aramis/map:
+        r0/map:
           Value: true
-        aramis/odom:
+        r0/odom:
           Value: true
-        aramis/payload_base_link:
+        r0/payload_base_link:
           Value: true
-        aramis/rear_left_wheel_link:
+        r0/rear_left_wheel_link:
           Value: true
-        aramis/rear_right_wheel_link:
+        r0/rear_right_wheel_link:
           Value: true
-        aramis/right_canister_link:
+        r0/right_canister_link:
           Value: true
-        aramis/right_diff_unit_headlight_link:
+        r0/right_diff_unit_headlight_link:
           Value: true
-        aramis/right_diff_unit_link:
+        r0/right_diff_unit_link:
           Value: true
-        aramis/right_diff_unit_taillight_link:
+        r0/right_diff_unit_taillight_link:
           Value: true
-        aramis/robot/base_link/lidar3d_0:
+        r0/robot/base_link/lidar3d_0:
           Value: true
-        aramis/turret_lidar_mount:
+        r0/turret_lidar_mount:
           Value: true
-        athos/base_link:
+        r1/base_link:
           Value: true
-        athos/base_plate:
+        r1/base_plate:
           Value: true
-        athos/chassis_link:
+        r1/chassis_link:
           Value: true
-        athos/default_mount:
+        r1/default_mount:
           Value: true
-        athos/diff_link:
+        r1/diff_link:
           Value: true
-        athos/front_left_wheel_link:
+        r1/front_left_wheel_link:
           Value: true
-        athos/front_right_wheel_link:
+        r1/front_right_wheel_link:
           Value: true
-        athos/imu_0_link:
+        r1/imu_0_link:
           Value: true
-        athos/keyframe:
+        r1/keyframe:
           Value: true
-        athos/left_canister_link:
+        r1/left_canister_link:
           Value: true
-        athos/left_diff_unit_headlight_link:
+        r1/left_diff_unit_headlight_link:
           Value: true
-        athos/left_diff_unit_link:
+        r1/left_diff_unit_link:
           Value: true
-        athos/left_diff_unit_taillight_link:
+        r1/left_diff_unit_taillight_link:
           Value: true
-        athos/lidar3d_0_laser:
+        r1/lidar3d_0_laser:
           Value: true
-        athos/lidar3d_0_link:
+        r1/lidar3d_0_link:
           Value: true
-        athos/lidar_tower:
+        r1/lidar_tower:
           Value: true
-        athos/map:
+        r1/map:
           Value: true
-        athos/odom:
+        r1/odom:
           Value: true
-        athos/payload_base_link:
+        r1/payload_base_link:
           Value: true
-        athos/rear_left_wheel_link:
+        r1/rear_left_wheel_link:
           Value: true
-        athos/rear_right_wheel_link:
+        r1/rear_right_wheel_link:
           Value: true
-        athos/right_canister_link:
+        r1/right_canister_link:
           Value: true
-        athos/right_diff_unit_headlight_link:
+        r1/right_diff_unit_headlight_link:
           Value: true
-        athos/right_diff_unit_link:
+        r1/right_diff_unit_link:
           Value: true
-        athos/right_diff_unit_taillight_link:
+        r1/right_diff_unit_taillight_link:
           Value: true
-        athos/robot/base_link/lidar3d_0:
+        r1/robot/base_link/lidar3d_0:
           Value: true
-        athos/turret_lidar_mount:
+        r1/turret_lidar_mount:
           Value: true
         map:
           Value: true
         odom:
           Value: true
-        porthos/base_link:
+        r2/base_link:
           Value: true
-        porthos/base_plate:
+        r2/base_plate:
           Value: true
-        porthos/chassis_link:
+        r2/chassis_link:
           Value: true
-        porthos/default_mount:
+        r2/default_mount:
           Value: true
-        porthos/diff_link:
+        r2/diff_link:
           Value: true
-        porthos/front_left_wheel_link:
+        r2/front_left_wheel_link:
           Value: true
-        porthos/front_right_wheel_link:
+        r2/front_right_wheel_link:
           Value: true
-        porthos/imu_0_link:
+        r2/imu_0_link:
           Value: true
-        porthos/keyframe:
+        r2/keyframe:
           Value: true
-        porthos/left_canister_link:
+        r2/left_canister_link:
           Value: true
-        porthos/left_diff_unit_headlight_link:
+        r2/left_diff_unit_headlight_link:
           Value: true
-        porthos/left_diff_unit_link:
+        r2/left_diff_unit_link:
           Value: true
-        porthos/left_diff_unit_taillight_link:
+        r2/left_diff_unit_taillight_link:
           Value: true
-        porthos/lidar3d_0_laser:
+        r2/lidar3d_0_laser:
           Value: true
-        porthos/lidar3d_0_link:
+        r2/lidar3d_0_link:
           Value: true
-        porthos/lidar_tower:
+        r2/lidar_tower:
           Value: true
-        porthos/map:
+        r2/map:
           Value: true
-        porthos/odom:
+        r2/odom:
           Value: true
-        porthos/payload_base_link:
+        r2/payload_base_link:
           Value: true
-        porthos/rear_left_wheel_link:
+        r2/rear_left_wheel_link:
           Value: true
-        porthos/rear_right_wheel_link:
+        r2/rear_right_wheel_link:
           Value: true
-        porthos/right_canister_link:
+        r2/right_canister_link:
           Value: true
-        porthos/right_diff_unit_headlight_link:
+        r2/right_diff_unit_headlight_link:
           Value: true
-        porthos/right_diff_unit_link:
+        r2/right_diff_unit_link:
           Value: true
-        porthos/right_diff_unit_taillight_link:
+        r2/right_diff_unit_taillight_link:
           Value: true
-        porthos/robot/base_link/lidar3d_0:
+        r2/robot/base_link/lidar3d_0:
           Value: true
-        porthos/turret_lidar_mount:
+        r2/turret_lidar_mount:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -223,133 +223,133 @@ Visualization Manager:
       Show Names: false
       Tree:
         map:
-          aramis/map:
-            aramis/odom:
-              aramis/base_link:
-                aramis/chassis_link:
-                  aramis/default_mount:
-                    aramis/base_plate:
-                      aramis/lidar_tower:
-                        aramis/turret_lidar_mount:
-                          aramis/lidar3d_0_link:
-                            aramis/lidar3d_0_laser:
+          r0/map:
+            r0/odom:
+              r0/base_link:
+                r0/chassis_link:
+                  r0/default_mount:
+                    r0/base_plate:
+                      r0/lidar_tower:
+                        r0/turret_lidar_mount:
+                          r0/lidar3d_0_link:
+                            r0/lidar3d_0_laser:
                               {}
-                            aramis/robot/base_link/lidar3d_0:
+                            r0/robot/base_link/lidar3d_0:
                               {}
-                      aramis/payload_base_link:
-                        aramis/left_canister_link:
+                      r0/payload_base_link:
+                        r0/left_canister_link:
                           {}
-                        aramis/right_canister_link:
+                        r0/right_canister_link:
                           {}
-                  aramis/diff_link:
+                  r0/diff_link:
                     {}
-                  aramis/imu_0_link:
+                  r0/imu_0_link:
                     {}
-                  aramis/left_diff_unit_link:
-                    aramis/front_left_wheel_link:
+                  r0/left_diff_unit_link:
+                    r0/front_left_wheel_link:
                       {}
-                    aramis/left_diff_unit_headlight_link:
+                    r0/left_diff_unit_headlight_link:
                       {}
-                    aramis/left_diff_unit_taillight_link:
+                    r0/left_diff_unit_taillight_link:
                       {}
-                    aramis/rear_left_wheel_link:
+                    r0/rear_left_wheel_link:
                       {}
-                  aramis/right_diff_unit_link:
-                    aramis/front_right_wheel_link:
+                  r0/right_diff_unit_link:
+                    r0/front_right_wheel_link:
                       {}
-                    aramis/rear_right_wheel_link:
+                    r0/rear_right_wheel_link:
                       {}
-                    aramis/right_diff_unit_headlight_link:
+                    r0/right_diff_unit_headlight_link:
                       {}
-                    aramis/right_diff_unit_taillight_link:
+                    r0/right_diff_unit_taillight_link:
                       {}
-              aramis/keyframe:
+              r0/keyframe:
                 {}
-          athos/map:
-            athos/odom:
-              athos/base_link:
-                athos/chassis_link:
-                  athos/default_mount:
-                    athos/base_plate:
-                      athos/lidar_tower:
-                        athos/turret_lidar_mount:
-                          athos/lidar3d_0_link:
-                            athos/lidar3d_0_laser:
+          r1/map:
+            r1/odom:
+              r1/base_link:
+                r1/chassis_link:
+                  r1/default_mount:
+                    r1/base_plate:
+                      r1/lidar_tower:
+                        r1/turret_lidar_mount:
+                          r1/lidar3d_0_link:
+                            r1/lidar3d_0_laser:
                               {}
-                            athos/robot/base_link/lidar3d_0:
+                            r1/robot/base_link/lidar3d_0:
                               {}
-                      athos/payload_base_link:
-                        athos/left_canister_link:
+                      r1/payload_base_link:
+                        r1/left_canister_link:
                           {}
-                        athos/right_canister_link:
+                        r1/right_canister_link:
                           {}
-                  athos/diff_link:
+                  r1/diff_link:
                     {}
-                  athos/imu_0_link:
+                  r1/imu_0_link:
                     {}
-                  athos/left_diff_unit_link:
-                    athos/front_left_wheel_link:
+                  r1/left_diff_unit_link:
+                    r1/front_left_wheel_link:
                       {}
-                    athos/left_diff_unit_headlight_link:
+                    r1/left_diff_unit_headlight_link:
                       {}
-                    athos/left_diff_unit_taillight_link:
+                    r1/left_diff_unit_taillight_link:
                       {}
-                    athos/rear_left_wheel_link:
+                    r1/rear_left_wheel_link:
                       {}
-                  athos/right_diff_unit_link:
-                    athos/front_right_wheel_link:
+                  r1/right_diff_unit_link:
+                    r1/front_right_wheel_link:
                       {}
-                    athos/rear_right_wheel_link:
+                    r1/rear_right_wheel_link:
                       {}
-                    athos/right_diff_unit_headlight_link:
+                    r1/right_diff_unit_headlight_link:
                       {}
-                    athos/right_diff_unit_taillight_link:
+                    r1/right_diff_unit_taillight_link:
                       {}
-              athos/keyframe:
+              r1/keyframe:
                 {}
           odom:
             {}
-          porthos/map:
-            porthos/odom:
-              porthos/base_link:
-                porthos/chassis_link:
-                  porthos/default_mount:
-                    porthos/base_plate:
-                      porthos/lidar_tower:
-                        porthos/turret_lidar_mount:
-                          porthos/lidar3d_0_link:
-                            porthos/lidar3d_0_laser:
+          r2/map:
+            r2/odom:
+              r2/base_link:
+                r2/chassis_link:
+                  r2/default_mount:
+                    r2/base_plate:
+                      r2/lidar_tower:
+                        r2/turret_lidar_mount:
+                          r2/lidar3d_0_link:
+                            r2/lidar3d_0_laser:
                               {}
-                            porthos/robot/base_link/lidar3d_0:
+                            r2/robot/base_link/lidar3d_0:
                               {}
-                      porthos/payload_base_link:
-                        porthos/left_canister_link:
+                      r2/payload_base_link:
+                        r2/left_canister_link:
                           {}
-                        porthos/right_canister_link:
+                        r2/right_canister_link:
                           {}
-                  porthos/diff_link:
+                  r2/diff_link:
                     {}
-                  porthos/imu_0_link:
+                  r2/imu_0_link:
                     {}
-                  porthos/left_diff_unit_link:
-                    porthos/front_left_wheel_link:
+                  r2/left_diff_unit_link:
+                    r2/front_left_wheel_link:
                       {}
-                    porthos/left_diff_unit_headlight_link:
+                    r2/left_diff_unit_headlight_link:
                       {}
-                    porthos/left_diff_unit_taillight_link:
+                    r2/left_diff_unit_taillight_link:
                       {}
-                    porthos/rear_left_wheel_link:
+                    r2/rear_left_wheel_link:
                       {}
-                  porthos/right_diff_unit_link:
-                    porthos/front_right_wheel_link:
+                  r2/right_diff_unit_link:
+                    r2/front_right_wheel_link:
                       {}
-                    porthos/rear_right_wheel_link:
+                    r2/rear_right_wheel_link:
                       {}
-                    porthos/right_diff_unit_headlight_link:
+                    r2/right_diff_unit_headlight_link:
                       {}
-                    porthos/right_diff_unit_taillight_link:
+                    r2/right_diff_unit_taillight_link:
                       {}
-              porthos/keyframe:
+              r2/keyframe:
                 {}
       Update Interval: 0
       Value: true
@@ -383,7 +383,7 @@ Visualization Manager:
         Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /aramis/mrg_slam/map_points
+        Value: /r0/mrg_slam/map_points
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -417,7 +417,7 @@ Visualization Manager:
         Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /aramis/mrg_slam/map_points_service
+        Value: /r0/mrg_slam/map_points_service
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
@@ -431,7 +431,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /aramis/mrg_slam/markers
+        Value: /r0/mrg_slam/markers
       Value: true
     - Angle Tolerance: 0.10000000149011612
       Class: rviz_default_plugins/Odometry
@@ -470,7 +470,7 @@ Visualization Manager:
         Filter size: 50
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /aramis/scan_matching_odometry/odom
+        Value: /r0/scan_matching_odometry/odom
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -482,7 +482,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /aramis/robot_description
+        Value: /r0/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -605,7 +605,7 @@ Visualization Manager:
         Inertia: false
         Mass: false
       Name: RobotModel
-      TF Prefix: aramis
+      TF Prefix: r0
       Update Interval: 0
       Value: true
       Visual Enabled: true
@@ -619,7 +619,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /athos/robot_description
+        Value: /r1/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -742,7 +742,7 @@ Visualization Manager:
         Inertia: false
         Mass: false
       Name: RobotModel
-      TF Prefix: athos
+      TF Prefix: r1
       Update Interval: 0
       Value: true
       Visual Enabled: true
@@ -756,7 +756,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /porthos/robot_description
+        Value: /r2/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -879,7 +879,7 @@ Visualization Manager:
         Inertia: false
         Mass: false
       Name: RobotModel
-      TF Prefix: porthos
+      TF Prefix: r2
       Update Interval: 0
       Value: true
       Visual Enabled: true

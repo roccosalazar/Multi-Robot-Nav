@@ -7,7 +7,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('config', default_value='musketeers.yaml', description='mrg_slam config file name.'),
+    DeclareLaunchArgument('config', default_value='swarm_slam.yaml', description='mrg_slam config file name.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
     DeclareLaunchArgument('world', default_value='warehouse', description='World frame id used for published SLAM pose.'),
     DeclareLaunchArgument('slam_pose_offset_x', default_value='0.0', description='Output SLAM pose x offset [m].'),
@@ -46,12 +46,12 @@ def generate_launch_description() -> LaunchDescription:
     pkg_musketeers_bringup = get_package_share_directory('musketeers_bringup')
     slam_bringup_launch = PathJoinSubstitution([pkg_musketeers_bringup, 'launch', 'mrg_single_slam.launch.py'])
 
-    aramis_slam = _slam_instance(slam_bringup_launch, 'aramis', '-3.0', '0.0', '0.0')
-    athos_slam = _slam_instance(slam_bringup_launch, 'athos', '0.0', '0.0', '0.0')
-    porthos_slam = _slam_instance(slam_bringup_launch, 'porthos', '3.0', '0.0', '0.0')
+    r0_slam = _slam_instance(slam_bringup_launch, 'r0', '-3.0', '0.0', '0.0')
+    r1_slam = _slam_instance(slam_bringup_launch, 'r1', '0.0', '0.0', '0.0')
+    r2_slam = _slam_instance(slam_bringup_launch, 'r2', '3.0', '0.0', '0.0')
 
     ld = LaunchDescription(ARGUMENTS)
-    ld.add_action(aramis_slam)
-    ld.add_action(athos_slam)
-    ld.add_action(porthos_slam)
+    ld.add_action(r0_slam)
+    ld.add_action(r1_slam)
+    ld.add_action(r2_slam)
     return ld

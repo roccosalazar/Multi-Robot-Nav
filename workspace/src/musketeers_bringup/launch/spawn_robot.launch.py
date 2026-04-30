@@ -10,7 +10,7 @@ from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJ
 
 
 ARGUMENTS = [
-	DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot name to spawn (e.g. aramis, athos, porthos).'),
+	DeclareLaunchArgument('robot_name', default_value='r0', description='Robot name to spawn (e.g. r0, r1, r2).'),
 	DeclareLaunchArgument('x', default_value='0.0', description='Initial x position of the robot.'),
 	DeclareLaunchArgument('y', default_value='0.0', description='Initial y position of the robot.'),
 	DeclareLaunchArgument('z', default_value='0.35', description='Initial z position of the robot.'),

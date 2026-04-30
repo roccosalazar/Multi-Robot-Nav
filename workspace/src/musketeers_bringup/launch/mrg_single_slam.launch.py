@@ -8,8 +8,8 @@ from launch_ros.actions import Node
 
 
 ARGUMENTS = [
-    DeclareLaunchArgument('robot_name', default_value='aramis', description='Robot namespace.'),
-    DeclareLaunchArgument('config', default_value='aramis.yaml', description='mrg_slam config file name.'),
+    DeclareLaunchArgument('robot_name', default_value='r0', description='Robot namespace.'),
+    DeclareLaunchArgument('config', default_value='r0.yaml', description='mrg_slam config file name.'),
     DeclareLaunchArgument('use_sim_time', default_value='true', choices=['true', 'false'], description='Use simulation time.'),
     DeclareLaunchArgument('world', default_value='warehouse', description='World frame id used for published SLAM pose.'),
     DeclareLaunchArgument('x', default_value='0.0', description='Initial SLAM x position.'),
