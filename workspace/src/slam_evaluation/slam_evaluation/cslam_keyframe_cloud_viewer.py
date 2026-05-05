@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Optional, Sequence, Set, Tuple
 
 import numpy as np
 import rclpy
 from cslam_common_interfaces.msg import KeyframeOdom, PoseGraph, VizPointCloud
 from geometry_msgs.msg import Pose as PoseMsg
-from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import ColorRGBA
-from visualization_msgs.msg import Marker, MarkerArray
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Header
 
 
 Key = Tuple[int, int]
@@ -126,7 +125,7 @@ def pose_from_odom_msg(msg: Odometry) -> Pose:
 
 
 class CslamKeyframeCloudViewer(Node):
-    """Publish one RViz marker per CSLAM keyframe cloud in the current global graph frame."""
+    """Build a single global PointCloud2 from CSLAM keyframe clouds."""
 
     def __init__(self) -> None:
         super().__init__("cslam_keyframe_cloud_viewer")
@@ -134,126 +133,59 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("pose_graph_topic", "/cslam/viz/pose_graph")
         self.declare_parameter("keyframe_cloud_topic", "/cslam/viz/keyframe_pointcloud")
         self.declare_parameter("keyframe_odom_topic", "/r0/cslam/keyframe_odom")
-        self.declare_parameter("output_topic", "/cslam_rviz/keyframe_cloud_markers")
+        self.declare_parameter("output_topic", "/cslam_rviz/map_points")
         self.declare_parameter("point_scale", 0.001)
         self.declare_parameter("max_points_per_keyframe", 1000)
         self.declare_parameter("keyframe_stride", 10)
+        self.declare_parameter("voxel_size", 0.10)
+        self.declare_parameter("publish_period_sec", 0.5)
+        self.declare_parameter("update_only_when_subscribed", True)
 
         self.pose_graph_topic = self.get_parameter("pose_graph_topic").get_parameter_value().string_value
         self.keyframe_cloud_topic = self.get_parameter("keyframe_cloud_topic").get_parameter_value().string_value
         self.keyframe_odom_topic = self.get_parameter("keyframe_odom_topic").get_parameter_value().string_value
         self.output_topic = self.get_parameter("output_topic").get_parameter_value().string_value
-        self.point_scale = float(self.get_parameter("point_scale").value)
         self.max_points_per_keyframe = int(self.get_parameter("max_points_per_keyframe").value)
         self.keyframe_stride = max(1, int(self.get_parameter("keyframe_stride").value))
+        self.voxel_size = max(0.0, float(self.get_parameter("voxel_size").value))
+        self.publish_period_sec = max(0.05, float(self.get_parameter("publish_period_sec").value))
+        self.update_only_when_subscribed = bool(self.get_parameter("update_only_when_subscribed").value)
 
         self.optimized_pose_cache: Dict[Key, Pose] = {}
         self.odom_pose_cache: Dict[Key, Pose] = {}
+        self.odom_frame_cache: Dict[Key, Tuple[str, str]] = {}
         self.cloud_cache: Dict[Key, np.ndarray] = {}
-        self.last_published_keys: Set[Key] = set()
+        self.cloud_frame_cache: Dict[Key, str] = {}
         self.global_frame_id: Optional[str] = None
         self.map_to_odom_transform: Optional[Transform] = None
+        self.last_cloud_stamp = None
+        self.map_dirty = False
+        self.publish_counter = 0
 
-        marker_qos = QoSProfile(
+        cloud_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
 
-        self.marker_publisher = self.create_publisher(MarkerArray, self.output_topic, marker_qos)
+        self.cloud_publisher = self.create_publisher(PointCloud2, self.output_topic, cloud_qos)
         self.create_subscription(PoseGraph, self.pose_graph_topic, self._pose_graph_callback, 20)
         self.create_subscription(VizPointCloud, self.keyframe_cloud_topic, self._keyframe_cloud_callback, 20)
         self.create_subscription(KeyframeOdom, self.keyframe_odom_topic, self._keyframe_odom_callback, 20)
+        self.create_timer(self.publish_period_sec, self._publish_map_if_needed)
 
         self.get_logger().info(
-            "CSLAM keyframe cloud viewer started: "
+            "CSLAM global map viewer started: "
             f"pose_graph_topic='{self.pose_graph_topic}', "
             f"keyframe_cloud_topic='{self.keyframe_cloud_topic}', "
             f"keyframe_odom_topic='{self.keyframe_odom_topic}', "
             f"output_topic='{self.output_topic}', "
-            f"point_scale={self.point_scale:.3f}, "
+            f"voxel_size={self.voxel_size:.3f}, "
             f"max_points_per_keyframe={self.max_points_per_keyframe}, "
-            f"keyframe_stride={self.keyframe_stride}"
+            f"keyframe_stride={self.keyframe_stride}, "
+            f"publish_period_sec={self.publish_period_sec:.2f}"
         )
-
-    def _color_for_robot(self, robot_id: int) -> ColorRGBA:
-        palette = (
-            (0.93, 0.33, 0.31),
-            (0.18, 0.54, 0.76),
-            (0.20, 0.67, 0.36),
-            (0.95, 0.77, 0.06),
-            (0.56, 0.27, 0.68),
-            (0.91, 0.49, 0.13),
-        )
-        r, g, b = palette[robot_id % len(palette)]
-        return ColorRGBA(r=float(r), g=float(g), b=float(b), a=0.85)
-
-    def _height_color(self, z: float, z_min: float, z_max: float) -> ColorRGBA:
-        if z_max - z_min <= 1e-6:
-            t = 0.5
-        else:
-            t = max(0.0, min(1.0, (z - z_min) / (z_max - z_min)))
-
-        stops = (
-            (0.00, (1.00, 0.10, 0.00)),
-            (0.25, (1.00, 0.90, 0.00)),
-            (0.50, (0.00, 0.90, 0.20)),
-            (0.75, (0.00, 0.85, 1.00)),
-            (1.00, (0.00, 0.20, 1.00)),
-        )
-
-        for idx in range(len(stops) - 1):
-            left_t, left_rgb = stops[idx]
-            right_t, right_rgb = stops[idx + 1]
-            if t <= right_t:
-                span = max(1e-6, right_t - left_t)
-                local_t = (t - left_t) / span
-                r = left_rgb[0] + local_t * (right_rgb[0] - left_rgb[0])
-                g = left_rgb[1] + local_t * (right_rgb[1] - left_rgb[1])
-                b = left_rgb[2] + local_t * (right_rgb[2] - left_rgb[2])
-                return ColorRGBA(r=float(r), g=float(g), b=float(b), a=0.95)
-
-        r, g, b = stops[-1][1]
-        return ColorRGBA(r=float(r), g=float(g), b=float(b), a=0.95)
-
-    def _marker_for_key(
-        self,
-        key: Key,
-        points_world: np.ndarray,
-        point_colors: List[ColorRGBA],
-        stamp,
-    ) -> Marker:
-        robot_id, keyframe_id = key
-        marker = Marker()
-        marker.header.stamp = stamp
-        marker.header.frame_id = self.global_frame_id if self.global_frame_id else ""
-        marker.ns = f"robot_{robot_id}"
-        marker.id = int(keyframe_id)
-        marker.type = Marker.SPHERE_LIST
-        marker.action = Marker.ADD
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = self.point_scale
-        marker.scale.y = self.point_scale
-        marker.scale.z = self.point_scale
-        marker.color = self._color_for_robot(robot_id)
-        marker.frame_locked = False
-        marker.points = [
-            Point(x=float(point[0]), y=float(point[1]), z=float(point[2]))
-            for point in points_world
-        ]
-        marker.colors = point_colors
-        return marker
-
-    def _delete_marker_for_key(self, key: Key, stamp) -> Marker:
-        robot_id, keyframe_id = key
-        marker = Marker()
-        marker.header.stamp = stamp
-        marker.header.frame_id = self.global_frame_id if self.global_frame_id else ""
-        marker.ns = f"robot_{robot_id}"
-        marker.id = int(keyframe_id)
-        marker.action = Marker.DELETE
-        return marker
 
     def _extract_xyz_points(self, msg: VizPointCloud) -> np.ndarray:
         cloud = msg.pointcloud
@@ -279,7 +211,7 @@ class CslamKeyframeCloudViewer(Node):
 
         return points
 
-    def _transform_points_to_global(
+    def _transform_odom_points_to_global(
         self,
         points_odom: np.ndarray,
         optimized_pose: Pose,
@@ -297,7 +229,19 @@ class CslamKeyframeCloudViewer(Node):
         points_base = (points_odom - translation_odom) @ rotation_odom
         return points_base @ rotation_map.T + translation_map
 
-    def _transform_points_with_anchor(
+    def _transform_local_points_to_global(
+        self,
+        points_local: np.ndarray,
+        optimized_pose: Pose,
+    ) -> np.ndarray:
+        if len(points_local) == 0:
+            return points_local
+
+        translation_map, quaternion_map = optimized_pose
+        rotation_map = quaternion_to_rotation_matrix(quaternion_map)
+        return points_local @ rotation_map.T + translation_map
+
+    def _transform_odom_points_with_anchor(
         self,
         points_odom: np.ndarray,
         map_to_odom: Transform,
@@ -309,6 +253,35 @@ class CslamKeyframeCloudViewer(Node):
         rotation_map_odom = quaternion_to_rotation_matrix(quaternion_map_odom)
         return points_odom @ rotation_map_odom.T + translation_map_odom
 
+    def _transform_local_points_with_anchor(
+        self,
+        points_local: np.ndarray,
+        odom_pose: Pose,
+        map_to_odom: Transform,
+    ) -> np.ndarray:
+        if len(points_local) == 0:
+            return points_local
+
+        translation_odom, quaternion_odom = odom_pose
+        rotation_odom = quaternion_to_rotation_matrix(quaternion_odom)
+        points_odom = points_local @ rotation_odom.T + translation_odom
+        return self._transform_odom_points_with_anchor(points_odom, map_to_odom)
+
+    def _cloud_is_in_odom_frame(self, key: Key) -> bool:
+        cloud_frame = self.cloud_frame_cache.get(key, "").strip("/")
+        odom_frames = self.odom_frame_cache.get(key)
+        if not odom_frames:
+            return True
+
+        odom_frame, base_frame = [frame.strip("/") for frame in odom_frames]
+        if not cloud_frame:
+            return True
+        if cloud_frame == odom_frame:
+            return True
+        if cloud_frame == base_frame:
+            return False
+        return True
+
     def _refresh_map_to_odom_transform(self) -> None:
         candidate_keys = sorted(set(self.optimized_pose_cache.keys()) & set(self.odom_pose_cache.keys()))
         if not candidate_keys:
@@ -319,82 +292,136 @@ class CslamKeyframeCloudViewer(Node):
         odom_pose = self.odom_pose_cache[anchor_key]
         self.map_to_odom_transform = compose_pose(optimized_pose, invert_pose(odom_pose))
 
-    def _publish_markers(self) -> None:
-        if not self.global_frame_id:
-            return
+    def _mark_dirty(self) -> None:
+        self.map_dirty = True
 
-        stamp = self.get_clock().now().to_msg()
-        visible_keys = set(self.cloud_cache.keys()) & set(self.odom_pose_cache.keys())
-        markers = []
-        points_world_by_key: Dict[Key, np.ndarray] = {}
+    def _build_world_cloud(self) -> np.ndarray:
+        visible_keys = sorted(set(self.cloud_cache.keys()) & set(self.odom_pose_cache.keys()))
+        world_chunks = []
 
-        for key in sorted(visible_keys):
+        for key in visible_keys:
+            points_local = self.cloud_cache[key]
             if key in self.optimized_pose_cache:
-                points_world_by_key[key] = self._transform_points_to_global(
-                    self.cloud_cache[key],
-                    self.optimized_pose_cache[key],
-                    self.odom_pose_cache[key],
-                )
+                if self._cloud_is_in_odom_frame(key):
+                    points_world = self._transform_odom_points_to_global(
+                        points_local,
+                        self.optimized_pose_cache[key],
+                        self.odom_pose_cache[key],
+                    )
+                else:
+                    points_world = self._transform_local_points_to_global(
+                        points_local,
+                        self.optimized_pose_cache[key],
+                    )
             elif self.map_to_odom_transform is not None:
-                points_world_by_key[key] = self._transform_points_with_anchor(
-                    self.cloud_cache[key],
-                    self.map_to_odom_transform,
-                )
-
-        render_keys = set(points_world_by_key.keys())
-
-        non_empty_z_arrays = [points[:, 2] for points in points_world_by_key.values() if len(points) > 0]
-        if non_empty_z_arrays:
-            all_z = np.concatenate(non_empty_z_arrays)
-            if all_z.size > 0:
-                z_min = float(np.min(all_z))
-                z_max = float(np.max(all_z))
+                if self._cloud_is_in_odom_frame(key):
+                    points_world = self._transform_odom_points_with_anchor(
+                        points_local,
+                        self.map_to_odom_transform,
+                    )
+                else:
+                    points_world = self._transform_local_points_with_anchor(
+                        points_local,
+                        self.odom_pose_cache[key],
+                        self.map_to_odom_transform,
+                    )
             else:
-                z_min = 0.0
-                z_max = 1.0
-        else:
-            z_min = 0.0
-            z_max = 1.0
+                continue
 
-        for key in sorted(render_keys):
-            points_world = points_world_by_key[key]
-            point_colors = [self._height_color(float(point[2]), z_min, z_max) for point in points_world]
-            markers.append(self._marker_for_key(key, points_world, point_colors, stamp))
+            if len(points_world) > 0:
+                world_chunks.append(points_world.astype(np.float32, copy=False))
 
-        for key in sorted(self.last_published_keys - render_keys):
-            markers.append(self._delete_marker_for_key(key, stamp))
+        if not world_chunks:
+            return np.empty((0, 3), dtype=np.float32)
 
-        if not markers and not self.last_published_keys:
+        world_cloud = np.concatenate(world_chunks, axis=0)
+        return self._voxel_downsample(world_cloud)
+
+    def _voxel_downsample(self, points: np.ndarray) -> np.ndarray:
+        if len(points) == 0 or self.voxel_size <= 0.0:
+            return points
+
+        voxel_indices = np.floor(points / self.voxel_size).astype(np.int32)
+        _, unique_indices = np.unique(voxel_indices, axis=0, return_index=True)
+        unique_indices.sort()
+        return points[unique_indices]
+
+    def _make_pointcloud2_msg(self, points: np.ndarray) -> PointCloud2:
+        header = Header()
+        header.frame_id = self.global_frame_id if self.global_frame_id else ""
+        header.stamp = self.last_cloud_stamp if self.last_cloud_stamp is not None else self.get_clock().now().to_msg()
+
+        msg = PointCloud2()
+        msg.header = header
+        msg.height = 1
+        msg.width = int(len(points))
+        msg.fields = [
+            PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+            PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+            PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
+        ]
+        msg.is_bigendian = False
+        msg.point_step = 12
+        msg.row_step = msg.point_step * msg.width
+        msg.is_dense = False
+        msg.data = np.asarray(points, dtype=np.float32).tobytes()
+        return msg
+
+    def _publish_map_if_needed(self) -> None:
+        if not self.map_dirty or not self.global_frame_id:
             return
 
-        marker_array = MarkerArray()
-        marker_array.markers = markers
-        self.marker_publisher.publish(marker_array)
-        self.last_published_keys = render_keys
+        if self.update_only_when_subscribed and self.cloud_publisher.get_subscription_count() == 0:
+            return
+
+        world_cloud = self._build_world_cloud()
+        cloud_msg = self._make_pointcloud2_msg(world_cloud)
+        self.cloud_publisher.publish(cloud_msg)
+        self.map_dirty = False
+        self.publish_counter += 1
+
+        if self.publish_counter <= 3 or self.publish_counter % 20 == 0:
+            self.get_logger().info(
+                "Published CSLAM global map "
+                f"keyframes={len(self.cloud_cache)} points={len(world_cloud)} "
+                f"optimized_poses={len(self.optimized_pose_cache)}"
+            )
 
     def _pose_graph_callback(self, msg: PoseGraph) -> None:
         self.global_frame_id = f"robot{msg.origin_robot_id}_map"
+        current_keys: Set[Key] = set()
 
         for value in msg.values:
             key = (int(value.key.robot_id), int(value.key.keyframe_id))
             self.optimized_pose_cache[key] = pose_from_pose_msg(value.pose)
+            current_keys.add(key)
+
+        stale_keys = set(self.optimized_pose_cache.keys()) - current_keys
+        for key in stale_keys:
+            self.optimized_pose_cache.pop(key, None)
 
         self._refresh_map_to_odom_transform()
-        self._publish_markers()
+        self.last_cloud_stamp = self.get_clock().now().to_msg()
+        self._mark_dirty()
 
     def _keyframe_cloud_callback(self, msg: VizPointCloud) -> None:
         key = (int(msg.robot_id), int(msg.keyframe_id))
         if self.keyframe_stride > 1 and key[1] % self.keyframe_stride != 0:
             return
+
         self.cloud_cache[key] = self._extract_xyz_points(msg)
-        self._publish_markers()
+        self.cloud_frame_cache[key] = msg.pointcloud.header.frame_id
+        self.last_cloud_stamp = msg.pointcloud.header.stamp
+        self._mark_dirty()
 
     def _keyframe_odom_callback(self, msg: KeyframeOdom) -> None:
         robot_id = self._infer_robot_id_from_odom(msg.odom)
         key = (robot_id, int(msg.id))
         self.odom_pose_cache[key] = pose_from_odom_msg(msg.odom)
+        self.odom_frame_cache[key] = (msg.odom.header.frame_id, msg.odom.child_frame_id)
+        self.last_cloud_stamp = msg.odom.header.stamp
         self._refresh_map_to_odom_transform()
-        self._publish_markers()
+        self._mark_dirty()
 
     def _infer_robot_id_from_odom(self, odom: Odometry) -> int:
         frame_tokens = [

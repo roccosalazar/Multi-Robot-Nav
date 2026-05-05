@@ -122,23 +122,33 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_cloud_output_topic',
-        default_value='/cslam_rviz/keyframe_cloud_markers',
-        description='Output MarkerArray topic for the keyframe cloud viewer.',
+        default_value='/cslam_rviz/map_points',
+        description='Output PointCloud2 topic for the CSLAM global map viewer.',
     ),
     DeclareLaunchArgument(
         'keyframe_point_scale',
         default_value='0.08',
-        description='Marker point size for the keyframe cloud viewer [m].',
+        description='Legacy parameter kept for backward compatibility with the old marker-based viewer.',
     ),
     DeclareLaunchArgument(
         'max_points_per_keyframe',
         default_value='0',
-        description='Maximum rendered points per keyframe. Use 0 to disable downsampling.',
+        description='Maximum stored points per keyframe before global-map fusion. Use 0 to disable downsampling.',
     ),
     DeclareLaunchArgument(
         'keyframe_stride',
-        default_value='10',
-        description='Render only one keyframe cloud every N keyframes. Use 1 to render all keyframes.',
+        default_value='1',
+        description='Use only one keyframe cloud every N keyframes. Use 1 to use all keyframes.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_voxel_size',
+        default_value='0.10',
+        description='Voxel size in meters used to downsample the fused global CSLAM map.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_publish_period_sec',
+        default_value='0.5',
+        description='Publish period in seconds for the fused global CSLAM map.',
     ),
 ]
 
@@ -372,6 +382,8 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
                 'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
                 'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
                 'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),
+                'voxel_size': _get_launch_float(context, 'keyframe_cloud_voxel_size'),
+                'publish_period_sec': _get_launch_float(context, 'keyframe_cloud_publish_period_sec'),
             }
         ],
     )

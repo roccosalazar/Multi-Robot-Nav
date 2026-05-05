@@ -72,7 +72,8 @@ class CSLAMPoseGraphRViz(Node):
             keyframe_positions[key] = point
             node_points_by_robot.setdefault(key[0], []).append(point)
 
-        intra_robot_segments: List[Point] = []
+        intra_robot_odom_segments: List[Point] = []
+        intra_robot_loop_segments: List[Point] = []
         inter_robot_segments: List[Point] = []
 
         for edge in msg.edges:
@@ -85,7 +86,10 @@ class CSLAMPoseGraphRViz(Node):
                 continue
 
             if edge.key_from.robot_id == edge.key_to.robot_id:
-                intra_robot_segments.extend([point_from, point_to])
+                if abs(key_from[1] - key_to[1]) == 1:
+                    intra_robot_odom_segments.extend([point_from, point_to])
+                else:
+                    intra_robot_loop_segments.extend([point_from, point_to])
             else:
                 inter_robot_segments.extend([point_from, point_to])
 
@@ -110,9 +114,21 @@ class CSLAMPoseGraphRViz(Node):
                 marker_id=marker_id,
                 frame_id=frame_id,
                 timestamp=timestamp,
-                namespace='intra_robot_edges',
-                points=intra_robot_segments,
+                namespace='intra_robot_odom_edges',
+                points=intra_robot_odom_segments,
                 color=self._rgba(0.15, 0.65, 1.0, 0.95),
+            )
+        )
+        marker_id += 1
+
+        marker_array.markers.append(
+            self._make_edges_marker(
+                marker_id=marker_id,
+                frame_id=frame_id,
+                timestamp=timestamp,
+                namespace='intra_robot_loop_edges',
+                points=intra_robot_loop_segments,
+                color=self._rgba(0.62, 0.22, 0.87, 0.98),
             )
         )
         marker_id += 1

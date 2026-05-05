@@ -271,6 +271,8 @@ class LidarHandler:
                 msg_pointcloud = KeyframePointCloud()
                 msg_pointcloud.id = self.nb_local_keyframes
                 msg_pointcloud.pointcloud = icp_utils.open3d_to_ros(self.local_descriptors_map[self.nb_local_keyframes])
+                msg_pointcloud.pointcloud.header.frame_id = data[0].header.frame_id
+                msg_pointcloud.pointcloud.header.stamp = data[0].header.stamp
                 self.keyframe_pointcloud_publisher.publish(msg_pointcloud)
                 # Publish odom
                 msg_odom = KeyframeOdom()

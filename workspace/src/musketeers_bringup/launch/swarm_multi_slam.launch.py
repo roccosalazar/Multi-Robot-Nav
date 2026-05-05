@@ -122,23 +122,33 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_cloud_output_topic',
-        default_value='/cslam_rviz/keyframe_cloud_markers',
-        description='Output MarkerArray topic for the keyframe cloud viewer.',
+        default_value='/cslam_rviz/map_points',
+        description='Output PointCloud2 topic for the CSLAM global map viewer.',
     ),
     DeclareLaunchArgument(
         'keyframe_point_scale',
         default_value='0.08',
-        description='Marker point size for the keyframe cloud viewer in meters.',
+        description='Legacy parameter kept for backward compatibility with the old marker-based viewer.',
     ),
     DeclareLaunchArgument(
         'max_points_per_keyframe',
         default_value='0',
-        description='Maximum rendered points per keyframe. Use 0 to disable downsampling.',
+        description='Maximum stored points per keyframe before global-map fusion. Use 0 to disable downsampling.',
     ),
     DeclareLaunchArgument(
         'keyframe_stride',
         default_value='10',
-        description='Render only one keyframe cloud every N keyframes. Use 1 to render all keyframes.',
+        description='Use only one keyframe cloud every N keyframes. Use 1 to use all keyframes.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_voxel_size',
+        default_value='0.10',
+        description='Voxel size in meters used to downsample the fused global CSLAM map.',
+    ),
+    DeclareLaunchArgument(
+        'keyframe_cloud_publish_period_sec',
+        default_value='0.5',
+        description='Publish period in seconds for the fused global CSLAM map.',
     ),
 ]
 
@@ -190,6 +200,8 @@ def _create_swarm_single_slam_instance(
             'keyframe_point_scale': LaunchConfiguration('keyframe_point_scale'),
             'max_points_per_keyframe': LaunchConfiguration('max_points_per_keyframe'),
             'keyframe_stride': LaunchConfiguration('keyframe_stride'),
+            'keyframe_cloud_voxel_size': LaunchConfiguration('keyframe_cloud_voxel_size'),
+            'keyframe_cloud_publish_period_sec': LaunchConfiguration('keyframe_cloud_publish_period_sec'),
         }.items(),
     )
 

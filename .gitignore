@@ -7,6 +7,10 @@
 /install/
 /log/
 
+# Ignore bag files/directories
+/bags/
+**/bags/
+
 # Nested workspaces (multi-workspace repos)
 **/build/
 **/install/
@@ -69,3 +73,5 @@ Thumbs.db
 !/robots/payloads/
 !/robots/payloads/**
 !/robots/**/robot.yaml
+
+

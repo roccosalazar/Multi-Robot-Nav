@@ -101,6 +101,11 @@ def downsample(points, voxel_size):
 
 
 def solve_teaser(src, dst, voxel_size, min_inliers):
+    if len(src.points) == 0 or len(dst.points) == 0:
+        rclpy.logging.get_logger('cslam').info(
+            'Failed to compute loop closure. Empty point cloud received.')
+        return False, None, None
+
     src_feats = extract_fpfh(src, voxel_size)
     dst_feats = extract_fpfh(dst, voxel_size)
 
@@ -108,12 +113,19 @@ def solve_teaser(src, dst, voxel_size, min_inliers):
                                                 dst_feats,
                                                 mutual_filter=True)
 
+    if len(corrs_src) == 0 or len(corrs_dst) == 0:
+        rclpy.logging.get_logger('cslam').info(
+            'Failed to compute loop closure. No feature correspondences found.')
+        return False, None, None
+
     src_xyz = pcd2xyz(src)  # np array of size 3 by N
     dst_xyz = pcd2xyz(dst)  # np array of size 3 by M
     src_corr = src_xyz[:, corrs_src]  # np array of size 3 by num_corrs
     dst_corr = dst_xyz[:, corrs_dst]  # np array of size 3 by num_corrs
 
     solver = get_teaser_solver(voxel_size)
+    # TEASER++ estimates the rigid transform that maps source correspondences
+    # onto target correspondences, i.e. src -> dst.
     solver.solve(src_corr, dst_corr)
 
     solution = solver.getSolution()
@@ -136,7 +148,8 @@ def solve_teaser(src, dst, voxel_size, min_inliers):
         rclpy.logging.get_logger('cslam').info(
             'Failed to compute loop closure. Number of inliers ( {} / {} )'.
             format(len(solver.getInlierMaxClique()), min_inliers))
-    return valid, solution.translation, solution.rotation
+        return False, None, None
+    return True, solution.translation, solution.rotation
 
 
 def to_transform_msg(translation, rotation):
@@ -178,7 +191,9 @@ def downsample_ros_pointcloud(pc_msg, voxel_size):
 def compute_transform(src, dst, voxel_size, min_inliers):
     """Computes a 3D transform between 2 point clouds using TEASER++.
 
-    Be careful: TEASER++ computes the transform from dst to src.
+    Returns the transform that maps ``src`` onto ``dst``.
+    TEASER++ and the Open3D ICP refinement both use the same source-to-target
+    convention, so the result is suitable for a BetweenFactor(src, dst, ...).
 
     Args:
         src (Open3D point cloud): pointcloud from
@@ -191,6 +206,10 @@ def compute_transform(src, dst, voxel_size, min_inliers):
     """
     valid, translation, rotation = solve_teaser(src, dst, voxel_size,
                                                 min_inliers)
-    success = valid
+    if not valid or translation is None or rotation is None:
+        transform = Transform()
+        transform.rotation.w = 1.0
+        return transform, False
+
     transform = to_transform_msg(translation, rotation)
-    return transform, success
+    return transform, True
