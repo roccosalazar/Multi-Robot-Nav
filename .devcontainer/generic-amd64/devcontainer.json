@@ -33,7 +33,8 @@
         "ranch-hand-robotics.rde-ros-2",
         "ranch-hand-robotics.rde-pack",
         "ranch-hand-robotics.urdf-editor",
-        "github.copilot-chat"
+        "github.copilot-chat",
+        "openai.chatgpt"
       ]
     }
   },

@@ -130,6 +130,19 @@ RUN sudo apt-get update && sudo apt-get install -y \
     libqglviewer-dev-qt5 \
     && sudo rm -rf /var/lib/apt/lists/*
 
+# Install Livox-SDK2 for Livox ROS drivers and FAST_LIO support.
+RUN cd /tmp && \
+    git clone https://github.com/Livox-SDK/Livox-SDK2.git && \
+    cd Livox-SDK2 && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. && \
+    make -j2 && \
+    sudo make install && \
+    sudo ldconfig && \
+    cd / && \
+    sudo rm -rf /tmp/Livox-SDK2
+
 RUN sudo apt-get update && sudo apt-get install -y \
     ros-humble-rviz2 \
     ros-humble-tf2-tools \
