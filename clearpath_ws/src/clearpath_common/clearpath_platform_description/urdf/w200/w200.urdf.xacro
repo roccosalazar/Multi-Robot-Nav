@@ -152,6 +152,9 @@
       </xacro:w200_track>
     </xacro:if>
 
+    <xacro:property name="robot_ns" value="$(arg namespace)"/>
+    <xacro:property name="frame_prefix" value="${robot_ns + '/' if robot_ns != '' else ''}"/>
+
     <!-- Virtual Mounting Point -->
     <link name="default_mount"></link>
 
@@ -179,7 +182,7 @@
         <always_on>true</always_on>
         <update_rate>50</update_rate>
         <visualize>true</visualize>
-        <ignition_frame_id>imu_0_link</ignition_frame_id>
+        <ignition_frame_id>${frame_prefix}imu_0_link</ignition_frame_id>
         <topic>$(arg namespace)/sensors/imu_0/data_raw</topic>
       </sensor>
     </gazebo>
