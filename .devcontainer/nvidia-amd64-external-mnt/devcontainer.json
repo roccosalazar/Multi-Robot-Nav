@@ -1,6 +1,6 @@
 {
-  "name": "Humble Desktop-Full (NVIDIA ARM64)",
-  "dockerFile": "../Dockerfile.arm64",
+  "name": "Humble Desktop-Full (NVIDIA AMD64 External Mount)",
+  "dockerFile": "../Dockerfile.amd64",
   "remoteUser": "ubuntu",
   "hostRequirements": {
     "gpu": true
@@ -31,7 +31,8 @@
   "workspaceFolder": "/home/ubuntu/${localWorkspaceFolderBasename}",
   "mounts": [
     "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind",
+    "source=/mnt/storage/rosbags,target=/home/ubuntu/${localWorkspaceFolderBasename}/workspace/bags,type=bind"
   ],
   "customizations": {
     "vscode": {
