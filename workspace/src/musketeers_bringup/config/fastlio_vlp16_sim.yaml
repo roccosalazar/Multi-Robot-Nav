@@ -30,7 +30,10 @@
             fov_degree: 360.0
             det_range: 100.0
             extrinsic_est_en: false
-            extrinsic_T: [0.0, 0.0, 0.0]
+            # LiDAR pose in the IMU/body frame. Mirror the robot TF instead of
+            # assuming the sensors are co-located, otherwise FAST-LIO fuses the
+            # IMU with the wrong lever arm and the odometry becomes unstable.
+            extrinsic_T: [0.0, 0.0, 0.887]
             extrinsic_R: [1.0, 0.0, 0.0,
                           0.0, 1.0, 0.0,
                           0.0, 0.0, 1.0]
