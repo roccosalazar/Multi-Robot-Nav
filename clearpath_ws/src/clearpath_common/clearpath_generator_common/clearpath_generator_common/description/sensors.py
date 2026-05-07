@@ -31,6 +31,7 @@
 # of Clearpath Robotics.
 from typing import List
 
+from clearpath_config.common.types.config import BaseConfig
 from clearpath_config.sensors.types.cameras import (
     AxisCamera,
     BaseCamera,
@@ -181,6 +182,7 @@ class SensorDescription():
     class IntelRealsenseDescription(CameraDescription):
         IMAGE_WIDTH = 'image_width'
         IMAGE_HEIGHT = 'image_height'
+        ROBOT_NAMESPACE = 'robot_namespace'
 
         def __init__(self, sensor: IntelRealsense) -> None:
             super().__init__(sensor)
@@ -188,6 +190,7 @@ class SensorDescription():
             self.parameters.update({
                 self.IMAGE_HEIGHT: sensor.color_height,
                 self.IMAGE_WIDTH: sensor.color_width,
+                self.ROBOT_NAMESPACE: BaseConfig.get_namespace(),
             })
 
     class StereolabsZedDescription(CameraDescription):

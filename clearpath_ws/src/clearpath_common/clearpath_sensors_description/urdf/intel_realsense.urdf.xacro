@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:macro name="intel_realsense" params="name parent_link *origin
-                                              update_rate:=30.0 image_height:=480 image_width:=640">
+                                              update_rate:=30.0 image_height:=480 image_width:=640 robot_namespace:=''">
+    <xacro:property name="color_optical_frame_id" value="${robot_namespace + '/' + name + '_color_optical_frame' if robot_namespace else name + '_color_optical_frame'}"/>
 
     <xacro:macro name="sensor_d435"
                  params="parent *origin name:=camera
@@ -166,7 +167,7 @@
             <far>100</far>
           </clip>
           <ignition_frame_id>${name}_link</ignition_frame_id>
-          <optical_frame_id>${name}_color_optical_frame</optical_frame_id>
+          <optical_frame_id>${color_optical_frame_id}</optical_frame_id>
         </camera>
         <always_on>1</always_on>
         <update_rate>${update_rate}</update_rate>
