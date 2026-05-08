@@ -75,4 +75,5 @@ Thumbs.db
 !/robots/**/robot.yaml
 
 
-fast_lio_ws/src/FAST_LIO/Log/mat_pre.txt
+/fast_lio_ws/src/FAST_LIO/Log/
+*.log

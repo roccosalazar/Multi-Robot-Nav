@@ -17,8 +17,6 @@ import torchvision.models as models
 import numpy as np
 import sys
 import pickle
-import sklearn
-from sklearn.neighbors import NearestNeighbors
 from cslam.vpr.cosplace_utils.network import GeoLocalizationNet
 from ament_index_python.packages import get_package_share_directory
 
