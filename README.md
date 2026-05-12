@@ -98,7 +98,7 @@ Modified paths under `Multi-Robot-Graph-SLAM/`:
 - `Multi-Robot-Graph-SLAM/src/mrg_slam/config/r0.yaml`
 - `Multi-Robot-Graph-SLAM/src/mrg_slam/config/scanmatching.yaml`
 - `Multi-Robot-Graph-SLAM/src/mrg_slam/config/swarm_slam.yaml`
-- `Multi-Robot-Graph-SLAM/src/mrg_slam/config/swarm_team.yaml`
+- `Multi-Robot-Graph-SLAM/src/mrg_slam/config/r012.yaml`
 - `Multi-Robot-Graph-SLAM/src/mrg_slam/launch/mrg_slam.launch.py`
 - `Multi-Robot-Graph-SLAM/src/mrg_slam/launch/mrg_slam_v2.launch.py`
 
@@ -249,7 +249,7 @@ ros2 launch musketeers_bringup mrg_multi_slam.launch.py \
   world:=warehouse
 ```
 
-`mrg_multi_slam.launch.py` defaults to `config:=swarm_team.yaml`.
+`mrg_multi_slam.launch.py` defaults to `config:=r012.yaml`.
 
 ### 6. Run Swarm-SLAM / CSLAM for one robot
 

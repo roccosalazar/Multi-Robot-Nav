@@ -299,10 +299,10 @@ mrg_slam_component:
 
     # Multi-robot graph exchange policy.
     # PATH_PROXIMITY is a good default for your scenario.
-    graph_exchange_mode: "PATH_PROXIMITY"
-    graph_request_min_accum_dist: 2.0
-    graph_request_max_robot_dist: 50.0
-    graph_request_min_time_delay: 2.0
+    graph_exchange_mode: "CURRENT_PROXIMITY"
+    graph_request_min_accum_dist: 1.0
+    graph_request_max_robot_dist: 3.5
+    graph_request_min_time_delay: 1.0
 
     # Global map update settings.
     graph_update_interval: 3.0
