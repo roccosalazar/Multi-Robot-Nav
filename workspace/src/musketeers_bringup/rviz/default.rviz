@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /RobotModel1
-        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 1609
   - Class: rviz_common/Selection
@@ -27,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -48,122 +47,6 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
-      Value: true
-    - Class: rviz_default_plugins/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        r0/base_link:
-          Value: true
-        r0/base_plate:
-          Value: true
-        r0/chassis_link:
-          Value: true
-        r0/default_mount:
-          Value: true
-        r0/diff_link:
-          Value: true
-        r0/front_left_wheel_link:
-          Value: true
-        r0/front_right_wheel_link:
-          Value: true
-        r0/imu_0_link:
-          Value: true
-        r0/keyframe:
-          Value: true
-        r0/left_canister_link:
-          Value: true
-        r0/left_diff_unit_headlight_link:
-          Value: true
-        r0/left_diff_unit_link:
-          Value: true
-        r0/left_diff_unit_taillight_link:
-          Value: true
-        r0/lidar3d_0_laser:
-          Value: true
-        r0/lidar3d_0_link:
-          Value: true
-        r0/lidar_tower:
-          Value: true
-        r0/odom:
-          Value: true
-        r0/payload_base_link:
-          Value: true
-        r0/rear_left_wheel_link:
-          Value: true
-        r0/rear_right_wheel_link:
-          Value: true
-        r0/right_canister_link:
-          Value: true
-        r0/right_diff_unit_headlight_link:
-          Value: true
-        r0/right_diff_unit_link:
-          Value: true
-        r0/right_diff_unit_taillight_link:
-          Value: true
-        r0/robot/base_link/lidar3d_0:
-          Value: true
-        r0/turret_lidar_mount:
-          Value: true
-        robot0_current_pose:
-          Value: true
-        robot0_latest_optimized_pose:
-          Value: true
-        robot0_map:
-          Value: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        robot0_map:
-          r0/odom:
-            r0/base_link:
-              r0/chassis_link:
-                r0/default_mount:
-                  r0/base_plate:
-                    r0/lidar_tower:
-                      r0/turret_lidar_mount:
-                        r0/lidar3d_0_link:
-                          r0/lidar3d_0_laser:
-                            {}
-                          r0/robot/base_link/lidar3d_0:
-                            {}
-                    r0/payload_base_link:
-                      r0/left_canister_link:
-                        {}
-                      r0/right_canister_link:
-                        {}
-                r0/diff_link:
-                  {}
-                r0/imu_0_link:
-                  {}
-                r0/left_diff_unit_link:
-                  r0/front_left_wheel_link:
-                    {}
-                  r0/left_diff_unit_headlight_link:
-                    {}
-                  r0/left_diff_unit_taillight_link:
-                    {}
-                  r0/rear_left_wheel_link:
-                    {}
-                r0/right_diff_unit_link:
-                  r0/front_right_wheel_link:
-                    {}
-                  r0/rear_right_wheel_link:
-                    {}
-                  r0/right_diff_unit_headlight_link:
-                    {}
-                  r0/right_diff_unit_taillight_link:
-                    {}
-            r0/keyframe:
-              {}
-          robot0_latest_optimized_pose:
-            robot0_current_pose:
-              {}
-      Update Interval: 0
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -188,6 +71,47 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
         base_plate:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_0_bottom_screw_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_color_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_infra1_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_infra1_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_infra2_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_infra2_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_0_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -290,6 +214,15 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
+        turret_camera_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        turret_camera_support:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         turret_lidar_mount:
           Alpha: 1
           Show Axes: false
@@ -302,59 +235,10 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
-      Name: MarkerArray
-      Namespaces:
-        inter_robot_edges: true
-        intra_robot_loop_edges: true
-        intra_robot_odom_edges: true
-        nodes: true
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /cslam_rviz/pose_graph_markers
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 9.401200294494629
-        Min Value: -0.9877102375030518
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: AxisColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: PointCloud2
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Points
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /cslam_rviz/map_points
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: robot0_map
+    Fixed Frame: r0/base_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -397,25 +281,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 66.61402893066406
+      Distance: 7.74399995803833
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.0604631900787354
-        Y: 0.28518548607826233
-        Z: -2.469675302505493
+        X: 0
+        Y: 0
+        Z: 0
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8197973966598511
+      Pitch: 0.7303979992866516
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.0785629749298096
+      Yaw: 3.145397424697876
     Saved: ~
 Window Geometry:
   Displays:
