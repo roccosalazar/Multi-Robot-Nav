@@ -77,3 +77,5 @@ Thumbs.db
 
 /fast_lio_ws/src/FAST_LIO/Log/
 *.log
+
+/results
