@@ -71,6 +71,12 @@ ARGUMENTS = [
         description='Start the keyframe cloud viewer.',
     ),
     DeclareLaunchArgument(
+        'start_merged_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start the MRG-style cached merged map/graph viewer.',
+    ),
+    DeclareLaunchArgument(
         'swarm_slam_delay_sec',
         default_value='2.0',
         description='Delay before starting the core CSLAM nodes.',
@@ -92,7 +98,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'pose_graph_viewer_output_topic',
-        default_value='/cslam_rviz/pose_graph_markers',
+        default_value='cslam_rviz/pose_graph_markers',
         description='Output MarkerArray topic for the pose graph viewer.',
     ),
     DeclareLaunchArgument(
@@ -122,7 +128,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_cloud_output_topic',
-        default_value='/cslam_rviz/map_points',
+        default_value='cslam_rviz/map_points',
         description='Output PointCloud2 topic for the CSLAM global map viewer.',
     ),
     DeclareLaunchArgument(
@@ -149,6 +155,26 @@ ARGUMENTS = [
         'keyframe_cloud_publish_period_sec',
         default_value='0.5',
         description='Publish period in seconds for the fused global CSLAM map.',
+    ),
+    DeclareLaunchArgument(
+        'merged_viewer_delay_sec',
+        default_value='6.0',
+        description='Delay before starting the cached merged CSLAM viewers.',
+    ),
+    DeclareLaunchArgument(
+        'merged_pose_graph_topic',
+        default_value='cslam/viz/merged_pose_graph',
+        description='Pose graph topic containing the cached merged graph known by this robot.',
+    ),
+    DeclareLaunchArgument(
+        'merged_pose_graph_output_topic',
+        default_value='cslam_rviz/merged_pose_graph_markers',
+        description='Output MarkerArray topic for the cached merged pose graph.',
+    ),
+    DeclareLaunchArgument(
+        'merged_map_output_topic',
+        default_value='cslam_rviz/merged_map_points',
+        description='Output PointCloud2 topic for the cached merged map points.',
     ),
 ]
 
@@ -302,8 +328,13 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
             {
                 'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
                 'cslam_pose_topic': 'cslam/current_pose_estimate',
+                'reference_frames_topic': 'cslam/reference_frames',
                 'odom_topic': 'scan_matching_odometry/odom',
+                'robot_id': _get_launch_int(context, 'robot_id'),
+                'local_map_frame_id': f"robot{_get_launch_int(context, 'robot_id')}_map",
+                'use_local_map_frame': True,
                 'max_anchor_time_diff_sec': 2.0,
+                'initialize_anchor_from_first_pose': False,
             }
         ],
         arguments=log_args,
@@ -344,8 +375,10 @@ def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluatio
         ),
         launch_arguments={
             'use_sim_time': _get_launch_value(context, 'use_sim_time'),
+            'namespace': _get_launch_value(context, 'robot_name'),
             'input_topic': _get_launch_value(context, 'pose_graph_viewer_input_topic'),
             'output_topic': _get_launch_value(context, 'pose_graph_viewer_output_topic'),
+            'robot_id': _get_launch_value(context, 'robot_id'),
             'node_scale': _get_launch_value(context, 'pose_graph_viewer_node_scale'),
             'edge_width': _get_launch_value(context, 'pose_graph_viewer_edge_width'),
         }.items(),
@@ -371,6 +404,7 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
         package='slam_evaluation',
         executable='cslam_keyframe_cloud_viewer',
         name='cslam_keyframe_cloud_viewer',
+        namespace=_get_launch_value(context, 'robot_name'),
         output='screen',
         parameters=[
             {
@@ -379,6 +413,7 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
                 'keyframe_cloud_topic': _get_launch_value(context, 'keyframe_cloud_topic'),
                 'keyframe_odom_topic': _get_launch_value(context, 'keyframe_odom_topic'),
                 'output_topic': _get_launch_value(context, 'keyframe_cloud_output_topic'),
+                'robot_id': _get_launch_int(context, 'robot_id'),
                 'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
                 'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
                 'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),
@@ -399,6 +434,78 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
     ]
 
 
+def _delayed_merged_pose_graph_viewer_action(
+    context: LaunchContext,
+    pkg_slam_evaluation: str,
+) -> list[TimerAction]:
+    """
+    Create a delayed action for the cached merged pose graph viewer.
+    """
+    merged_pose_graph_viewer_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'cslam_pose_graph_viewer.launch.py'])
+        ),
+        launch_arguments={
+            'use_sim_time': _get_launch_value(context, 'use_sim_time'),
+            'namespace': _get_launch_value(context, 'robot_name'),
+            'node_name': 'cslam_merged_pose_graph_rviz',
+            'input_topic': _get_launch_value(context, 'merged_pose_graph_topic'),
+            'output_topic': _get_launch_value(context, 'merged_pose_graph_output_topic'),
+            'robot_id': _get_launch_value(context, 'robot_id'),
+            'node_scale': _get_launch_value(context, 'pose_graph_viewer_node_scale'),
+            'edge_width': _get_launch_value(context, 'pose_graph_viewer_edge_width'),
+        }.items(),
+    )
+
+    delay_sec = _get_launch_float(context, 'merged_viewer_delay_sec')
+
+    return [
+        TimerAction(
+            period=delay_sec,
+            actions=[merged_pose_graph_viewer_launch],
+            condition=IfCondition(LaunchConfiguration('start_merged_viewer')),
+        )
+    ]
+
+
+def _delayed_merged_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerAction]:
+    """
+    Create a delayed action for the cached merged keyframe cloud viewer.
+    """
+    merged_keyframe_cloud_viewer_node = Node(
+        package='slam_evaluation',
+        executable='cslam_keyframe_cloud_viewer',
+        name='cslam_merged_keyframe_cloud_viewer',
+        namespace=_get_launch_value(context, 'robot_name'),
+        output='screen',
+        parameters=[
+            {
+                'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
+                'pose_graph_topic': _get_launch_value(context, 'merged_pose_graph_topic'),
+                'keyframe_cloud_topic': _get_launch_value(context, 'keyframe_cloud_topic'),
+                'keyframe_odom_topic': _get_launch_value(context, 'keyframe_odom_topic'),
+                'output_topic': _get_launch_value(context, 'merged_map_output_topic'),
+                'robot_id': -1,
+                'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
+                'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
+                'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),
+                'voxel_size': _get_launch_float(context, 'keyframe_cloud_voxel_size'),
+                'publish_period_sec': _get_launch_float(context, 'keyframe_cloud_publish_period_sec'),
+            }
+        ],
+    )
+
+    delay_sec = _get_launch_float(context, 'merged_viewer_delay_sec')
+
+    return [
+        TimerAction(
+            period=delay_sec,
+            actions=[merged_keyframe_cloud_viewer_node],
+            condition=IfCondition(LaunchConfiguration('start_merged_viewer')),
+        )
+    ]
+
+
 def generate_launch_description() -> LaunchDescription:
     """
     Generate a single flattened launch description for one CSLAM robot.
@@ -413,5 +520,9 @@ def generate_launch_description() -> LaunchDescription:
         OpaqueFunction(function=_delayed_pose_graph_viewer_action, args=[pkg_slam_evaluation])
     )
     launch_description.add_action(OpaqueFunction(function=_delayed_keyframe_cloud_viewer_action))
+    launch_description.add_action(
+        OpaqueFunction(function=_delayed_merged_pose_graph_viewer_action, args=[pkg_slam_evaluation])
+    )
+    launch_description.add_action(OpaqueFunction(function=_delayed_merged_keyframe_cloud_viewer_action))
 
     return launch_description

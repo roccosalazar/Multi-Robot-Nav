@@ -65,15 +65,21 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'start_graph_viewer',
-        default_value='false',
+        default_value='true',
         choices=['true', 'false'],
-        description='Start the pose graph viewer once from the first robot instance.',
+        description='Start one namespaced pose graph viewer per robot instance.',
     ),
     DeclareLaunchArgument(
         'start_cloud_viewer',
-        default_value='false',
+        default_value='true',
         choices=['true', 'false'],
-        description='Start the keyframe cloud viewer once from the first robot instance.',
+        description='Start one namespaced keyframe cloud viewer per robot instance.',
+    ),
+    DeclareLaunchArgument(
+        'start_merged_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start one MRG-style cached merged viewer per robot instance.',
     ),
     DeclareLaunchArgument(
         'swarm_slam_delay_sec',
@@ -97,7 +103,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'pose_graph_viewer_output_topic',
-        default_value='/cslam_rviz/pose_graph_markers',
+        default_value='cslam_rviz/pose_graph_markers',
         description='Output MarkerArray topic for the pose graph viewer.',
     ),
     DeclareLaunchArgument(
@@ -122,7 +128,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_cloud_output_topic',
-        default_value='/cslam_rviz/map_points',
+        default_value='cslam_rviz/map_points',
         description='Output PointCloud2 topic for the CSLAM global map viewer.',
     ),
     DeclareLaunchArgument(
@@ -137,7 +143,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_stride',
-        default_value='10',
+        default_value='1',
         description='Use only one keyframe cloud every N keyframes. Use 1 to use all keyframes.',
     ),
     DeclareLaunchArgument(
@@ -187,6 +193,7 @@ def _create_swarm_single_slam_instance(
             'log_level': LaunchConfiguration('log_level'),
             'start_graph_viewer': start_graph_viewer,
             'start_cloud_viewer': start_cloud_viewer,
+            'start_merged_viewer': LaunchConfiguration('start_merged_viewer'),
             'swarm_slam_delay_sec': LaunchConfiguration('swarm_slam_delay_sec'),
             'pose_graph_viewer_delay_sec': LaunchConfiguration('pose_graph_viewer_delay_sec'),
             'keyframe_cloud_viewer_delay_sec': LaunchConfiguration('keyframe_cloud_viewer_delay_sec'),
@@ -196,6 +203,7 @@ def _create_swarm_single_slam_instance(
             'pose_graph_viewer_edge_width': LaunchConfiguration('pose_graph_viewer_edge_width'),
             'keyframe_pose_graph_topic': LaunchConfiguration('keyframe_pose_graph_topic'),
             'keyframe_cloud_topic': LaunchConfiguration('keyframe_cloud_topic'),
+            'keyframe_odom_topic': f'/{robot_name}/cslam/keyframe_odom',
             'keyframe_cloud_output_topic': LaunchConfiguration('keyframe_cloud_output_topic'),
             'keyframe_point_scale': LaunchConfiguration('keyframe_point_scale'),
             'max_points_per_keyframe': LaunchConfiguration('max_points_per_keyframe'),
@@ -220,17 +228,14 @@ def generate_launch_description() -> LaunchDescription:
 
     launch_description = LaunchDescription(ARGUMENTS)
 
-    for index, (robot_name, robot_id) in enumerate(ROBOT_CONFIGS):
-        start_graph_viewer = LaunchConfiguration('start_graph_viewer') if index == 0 else 'false'
-        start_cloud_viewer = LaunchConfiguration('start_cloud_viewer') if index == 0 else 'false'
-
+    for robot_name, robot_id in ROBOT_CONFIGS:
         launch_description.add_action(
             _create_swarm_single_slam_instance(
                 swarm_single_slam_launch=swarm_single_slam_launch,
                 robot_name=robot_name,
                 robot_id=robot_id,
-                start_graph_viewer=start_graph_viewer,
-                start_cloud_viewer=start_cloud_viewer,
+                start_graph_viewer=LaunchConfiguration('start_graph_viewer'),
+                start_cloud_viewer=LaunchConfiguration('start_cloud_viewer'),
             )
         )
 

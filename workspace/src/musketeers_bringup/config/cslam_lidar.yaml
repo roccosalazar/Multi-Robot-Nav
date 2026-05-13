@@ -5,22 +5,24 @@
       sensor_type: "lidar"
       pointcloud_topic: "prefiltering/filtered_points"
 
-      voxel_size: 0.08
-      registration_min_inliers: 12
-      similarity_threshold: 0.97
+      voxel_size: 0.10
+      registration_min_inliers: 32
+      registration_min_fitness: 0.62
+      registration_max_rmse: 0.30
+      similarity_threshold: 0.85
 
       inter_robot_loop_closure_budget: 1
-      inter_robot_detection_period_sec: 8
+      inter_robot_detection_period_sec: 5
       enable_sparsification: true
       max_queue_size: 10
 
       global_descriptors_topic: "global_descriptors"
-      intra_loop_min_inbetween_keyframes: 80
+      intra_loop_min_inbetween_keyframes: 10
       detection_publication_period_sec: 0.5
       detection_publication_max_elems_per_msg: 100
       enable_intra_robot_loop_closures: true
 
-      keyframe_generation_ratio_distance: 1.8
+      keyframe_generation_ratio_distance: 1.0
       pointcloud_odom_approx_time_sync_s: 0.05
       use_vertex_cover_selection: true
       map_manager_process_period_ms: 20

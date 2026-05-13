@@ -15,6 +15,8 @@
 #include <cslam_common_interfaces/msg/keyframe_odom.hpp>
 #include <cslam_common_interfaces/msg/optimization_result.hpp>
 #include <cslam_common_interfaces/msg/optimizer_state.hpp>
+#include <cslam_common_interfaces/msg/pose_graph_edge.hpp>
+#include <cslam_common_interfaces/msg/pose_graph_value.hpp>
 #include <cslam_common_interfaces/msg/reference_frames.hpp>
 #include <cslam_common_interfaces/msg/robot_ids_and_origin.hpp>
 #include <cslam_common_interfaces/msg/inter_robot_loop_closure.hpp>
@@ -22,6 +24,7 @@
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <builtin_interfaces/msg/time.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/u_int32.hpp>
 
@@ -247,6 +250,14 @@ namespace cslam
         void share_optimized_estimates(const gtsam::Values &estimates);
 
         /**
+         * @brief Publish the cached merged graph from this robot's perspective.
+         *
+         * The cache keeps remote graphs after rendezvous ends, matching the
+         * "what this robot knows" visualization used by centralized map views.
+         */
+        void publish_merged_visualization_pose_graph(const gtsam::Values &estimates);
+
+        /**
          * @brief Publish heartbeat message periodically
          *
          */
@@ -296,7 +307,11 @@ namespace cslam
         bool enable_visualization_;
 
         gtsam::SharedNoiseModel default_noise_model_;
+        gtsam::SharedNoiseModel loop_closure_noise_model_;
         float rotation_default_noise_std_, translation_default_noise_std_;
+        int intra_loop_redundancy_window_source_;
+        int intra_loop_redundancy_window_target_;
+        std::vector<std::pair<unsigned int, unsigned int>> accepted_intra_robot_loop_pairs_;
 
         gtsam::NonlinearFactorGraph::shared_ptr pose_graph_;
         gtsam::Values::shared_ptr current_pose_estimates_;
@@ -308,8 +323,11 @@ namespace cslam
 
         gtsam::Pose3 latest_local_pose_, local_pose_at_latest_optimization_,
             tentative_local_pose_at_latest_optimization_, latest_optimized_pose_;
-        gtsam::LabeledSymbol latest_local_symbol_;
+        gtsam::LabeledSymbol latest_local_symbol_,
+            local_symbol_at_latest_optimization_,
+            tentative_local_symbol_at_latest_optimization_;
         gtsam::LabeledSymbol anchor_symbol_;
+        builtin_interfaces::msg::Time latest_local_pose_stamp_;
         bool warned_missing_initial_keyframe_;
 
         bool enable_pose_timestamps_recording_;
@@ -376,6 +394,17 @@ namespace cslam
 
         rclcpp::Publisher<cslam_common_interfaces::msg::PoseGraph>::SharedPtr
             visualization_pose_graph_publisher_;
+
+        rclcpp::Publisher<cslam_common_interfaces::msg::PoseGraph>::SharedPtr
+            merged_visualization_pose_graph_publisher_;
+
+        std::map<unsigned int,
+                 std::vector<cslam_common_interfaces::msg::PoseGraphValue>>
+            merged_visualization_values_by_robot_;
+
+        std::map<std::pair<unsigned int, unsigned int>,
+                 std::vector<cslam_common_interfaces::msg::PoseGraphEdge>>
+            merged_visualization_edges_by_robot_pair_;
 
         cslam_common_interfaces::msg::RobotIdsAndOrigin current_neighbors_ids_;
 

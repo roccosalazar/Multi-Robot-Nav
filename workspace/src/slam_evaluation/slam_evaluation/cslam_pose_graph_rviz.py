@@ -19,11 +19,13 @@ class CSLAMPoseGraphRViz(Node):
 
         self.declare_parameter('input_topic', '/cslam/viz/pose_graph')
         self.declare_parameter('output_topic', '/cslam_rviz/pose_graph_markers')
+        self.declare_parameter('robot_id', -1)
         self.declare_parameter('node_scale', 0.30)
         self.declare_parameter('edge_width', 0.05)
 
         self.input_topic = str(self.get_parameter('input_topic').value)
         self.output_topic = str(self.get_parameter('output_topic').value)
+        self.robot_id = int(self.get_parameter('robot_id').value)
         self.node_scale = float(self.get_parameter('node_scale').value)
         self.edge_width = float(self.get_parameter('edge_width').value)
 
@@ -43,13 +45,18 @@ class CSLAMPoseGraphRViz(Node):
         )
 
         self._last_frame_id = None
+        self._published_graph_count = 0
 
         self.get_logger().info(
-            "Publishing RViz markers from '%s' to '%s' using frame 'robot{origin_robot_id}_map'."
-            % (self.input_topic, self.output_topic)
+            "Publishing RViz markers from '%s' to '%s' using frame 'robot{origin_robot_id}_map' "
+            "for robot_id=%d (-1 means all robots)."
+            % (self.input_topic, self.output_topic, self.robot_id)
         )
 
     def _pose_graph_callback(self, msg: PoseGraph) -> None:
+        if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
+            return
+
         frame_id = self._frame_id_from_msg(msg)
         if frame_id != self._last_frame_id:
             self.get_logger().info(
@@ -145,6 +152,30 @@ class CSLAMPoseGraphRViz(Node):
         )
 
         self.marker_pub.publish(marker_array)
+        self._published_graph_count += 1
+
+        if self._published_graph_count <= 5 or self._published_graph_count % 20 == 0:
+            node_counts = ', '.join(
+                f'{robot_id}:{len(points)}'
+                for robot_id, points in sorted(node_points_by_robot.items())
+            )
+            self.get_logger().info(
+                "Published pose graph markers "
+                "source_robot_id=%d origin_robot_id=%d values=%d edges=%d "
+                "node_counts={%s} odom_edge_segments=%d loop_edge_segments=%d "
+                "inter_robot_segments=%d frame='%s'"
+                % (
+                    int(msg.robot_id),
+                    int(msg.origin_robot_id),
+                    len(msg.values),
+                    len(msg.edges),
+                    node_counts,
+                    len(intra_robot_odom_segments) // 2,
+                    len(intra_robot_loop_segments) // 2,
+                    len(inter_robot_segments) // 2,
+                    frame_id,
+                )
+            )
 
     def _frame_id_from_msg(self, msg: PoseGraph) -> str:
         return f'robot{int(msg.origin_robot_id)}_map'
@@ -230,7 +261,8 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

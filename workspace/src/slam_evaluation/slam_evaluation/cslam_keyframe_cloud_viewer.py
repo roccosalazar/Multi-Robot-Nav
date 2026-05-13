@@ -134,6 +134,7 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("keyframe_cloud_topic", "/cslam/viz/keyframe_pointcloud")
         self.declare_parameter("keyframe_odom_topic", "/r0/cslam/keyframe_odom")
         self.declare_parameter("output_topic", "/cslam_rviz/map_points")
+        self.declare_parameter("robot_id", -1)
         self.declare_parameter("point_scale", 0.001)
         self.declare_parameter("max_points_per_keyframe", 1000)
         self.declare_parameter("keyframe_stride", 10)
@@ -145,6 +146,7 @@ class CslamKeyframeCloudViewer(Node):
         self.keyframe_cloud_topic = self.get_parameter("keyframe_cloud_topic").get_parameter_value().string_value
         self.keyframe_odom_topic = self.get_parameter("keyframe_odom_topic").get_parameter_value().string_value
         self.output_topic = self.get_parameter("output_topic").get_parameter_value().string_value
+        self.robot_id = int(self.get_parameter("robot_id").value)
         self.max_points_per_keyframe = int(self.get_parameter("max_points_per_keyframe").value)
         self.keyframe_stride = max(1, int(self.get_parameter("keyframe_stride").value))
         self.voxel_size = max(0.0, float(self.get_parameter("voxel_size").value))
@@ -161,6 +163,9 @@ class CslamKeyframeCloudViewer(Node):
         self.last_cloud_stamp = None
         self.map_dirty = False
         self.publish_counter = 0
+        self.pose_graph_msg_counter = 0
+        self.keyframe_cloud_msg_counter = 0
+        self.keyframe_odom_msg_counter = 0
 
         cloud_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
@@ -181,6 +186,7 @@ class CslamKeyframeCloudViewer(Node):
             f"keyframe_cloud_topic='{self.keyframe_cloud_topic}', "
             f"keyframe_odom_topic='{self.keyframe_odom_topic}', "
             f"output_topic='{self.output_topic}', "
+            f"robot_id={self.robot_id}, "
             f"voxel_size={self.voxel_size:.3f}, "
             f"max_points_per_keyframe={self.max_points_per_keyframe}, "
             f"keyframe_stride={self.keyframe_stride}, "
@@ -271,6 +277,8 @@ class CslamKeyframeCloudViewer(Node):
         cloud_frame = self.cloud_frame_cache.get(key, "").strip("/")
         odom_frames = self.odom_frame_cache.get(key)
         if not odom_frames:
+            if cloud_frame.endswith("base_link") or cloud_frame.endswith("base_footprint"):
+                return False
             return True
 
         odom_frame, base_frame = [frame.strip("/") for frame in odom_frames]
@@ -296,24 +304,26 @@ class CslamKeyframeCloudViewer(Node):
         self.map_dirty = True
 
     def _build_world_cloud(self) -> np.ndarray:
-        visible_keys = sorted(set(self.cloud_cache.keys()) & set(self.odom_pose_cache.keys()))
+        visible_keys = sorted(self.cloud_cache.keys())
         world_chunks = []
 
         for key in visible_keys:
             points_local = self.cloud_cache[key]
             if key in self.optimized_pose_cache:
-                if self._cloud_is_in_odom_frame(key):
+                if self._cloud_is_in_odom_frame(key) and key in self.odom_pose_cache:
                     points_world = self._transform_odom_points_to_global(
                         points_local,
                         self.optimized_pose_cache[key],
                         self.odom_pose_cache[key],
                     )
+                elif self._cloud_is_in_odom_frame(key):
+                    continue
                 else:
                     points_world = self._transform_local_points_to_global(
                         points_local,
                         self.optimized_pose_cache[key],
                     )
-            elif self.map_to_odom_transform is not None:
+            elif key in self.odom_pose_cache and self.map_to_odom_transform is not None:
                 if self._cloud_is_in_odom_frame(key):
                     points_world = self._transform_odom_points_with_anchor(
                         points_local,
@@ -388,6 +398,9 @@ class CslamKeyframeCloudViewer(Node):
             )
 
     def _pose_graph_callback(self, msg: PoseGraph) -> None:
+        if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
+            return
+
         self.global_frame_id = f"robot{msg.origin_robot_id}_map"
         current_keys: Set[Key] = set()
 
@@ -403,8 +416,21 @@ class CslamKeyframeCloudViewer(Node):
         self._refresh_map_to_odom_transform()
         self.last_cloud_stamp = self.get_clock().now().to_msg()
         self._mark_dirty()
+        self.pose_graph_msg_counter += 1
+
+        if self.pose_graph_msg_counter <= 5 or self.pose_graph_msg_counter % 20 == 0:
+            self.get_logger().info(
+                "Received pose graph "
+                f"source_robot_id={int(msg.robot_id)} origin_robot_id={int(msg.origin_robot_id)} "
+                f"values={len(msg.values)} edges={len(msg.edges)} "
+                f"optimized_keys={len(self.optimized_pose_cache)} "
+                f"frame='{self.global_frame_id}'"
+            )
 
     def _keyframe_cloud_callback(self, msg: VizPointCloud) -> None:
+        if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
+            return
+
         key = (int(msg.robot_id), int(msg.keyframe_id))
         if self.keyframe_stride > 1 and key[1] % self.keyframe_stride != 0:
             return
@@ -413,6 +439,15 @@ class CslamKeyframeCloudViewer(Node):
         self.cloud_frame_cache[key] = msg.pointcloud.header.frame_id
         self.last_cloud_stamp = msg.pointcloud.header.stamp
         self._mark_dirty()
+        self.keyframe_cloud_msg_counter += 1
+
+        if self.keyframe_cloud_msg_counter <= 5 or self.keyframe_cloud_msg_counter % 20 == 0:
+            raw_points = int(msg.pointcloud.width * msg.pointcloud.height)
+            self.get_logger().info(
+                "Received keyframe cloud "
+                f"key={key} raw_points={raw_points} stored_points={len(self.cloud_cache[key])} "
+                f"frame='{msg.pointcloud.header.frame_id}'"
+            )
 
     def _keyframe_odom_callback(self, msg: KeyframeOdom) -> None:
         robot_id = self._infer_robot_id_from_odom(msg.odom)
@@ -422,6 +457,14 @@ class CslamKeyframeCloudViewer(Node):
         self.last_cloud_stamp = msg.odom.header.stamp
         self._refresh_map_to_odom_transform()
         self._mark_dirty()
+        self.keyframe_odom_msg_counter += 1
+
+        if self.keyframe_odom_msg_counter <= 5 or self.keyframe_odom_msg_counter % 20 == 0:
+            self.get_logger().info(
+                "Received keyframe odom "
+                f"key={key} odom_frame='{msg.odom.header.frame_id}' "
+                f"base_frame='{msg.odom.child_frame_id}'"
+            )
 
     def _infer_robot_id_from_odom(self, odom: Odometry) -> int:
         frame_tokens = [

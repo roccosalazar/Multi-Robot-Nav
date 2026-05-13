@@ -5,10 +5,11 @@ from collections import deque
 from typing import Deque, Optional, Sequence, Tuple
 
 import rclpy
-from cslam_common_interfaces.msg import OptimizerState
+from cslam_common_interfaces.msg import OptimizerState, ReferenceFrames
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from tf2_ros import TransformBroadcaster
 
@@ -89,6 +90,24 @@ def pose_from_pose_msg(pose) -> Tuple[Vector3, Quaternion]:
     )
 
 
+def pose_from_transform_msg(transform) -> Tuple[Vector3, Quaternion]:
+    return (
+        (
+            float(transform.translation.x),
+            float(transform.translation.y),
+            float(transform.translation.z),
+        ),
+        quat_normalize(
+            (
+                float(transform.rotation.x),
+                float(transform.rotation.y),
+                float(transform.rotation.z),
+                float(transform.rotation.w),
+            )
+        ),
+    )
+
+
 class CslamOdomTfBridge(Node):
     """Bridge CSLAM global pose and local odometry into a coherent map->odom TF."""
 
@@ -97,7 +116,11 @@ class CslamOdomTfBridge(Node):
 
         self.declare_parameter("cslam_pose_topic", "cslam/current_pose_estimate")
         self.declare_parameter("optimizer_state_topic", "cslam/optimizer_state")
+        self.declare_parameter("reference_frames_topic", "cslam/reference_frames")
         self.declare_parameter("odom_topic", "scan_matching_odometry/odom")
+        self.declare_parameter("robot_id", -1)
+        self.declare_parameter("local_map_frame_id", "")
+        self.declare_parameter("use_local_map_frame", True)
         self.declare_parameter("max_anchor_time_diff_sec", 2.0)
         self.declare_parameter("odom_buffer_size", 200)
         self.declare_parameter("publish_on_odom", True)
@@ -107,7 +130,18 @@ class CslamOdomTfBridge(Node):
         self.optimizer_state_topic = (
             self.get_parameter("optimizer_state_topic").get_parameter_value().string_value
         )
+        self.reference_frames_topic = (
+            self.get_parameter("reference_frames_topic").get_parameter_value().string_value
+        )
         self.odom_topic = self.get_parameter("odom_topic").get_parameter_value().string_value
+        self.robot_id = int(self.get_parameter("robot_id").value)
+        configured_local_map_frame = (
+            self.get_parameter("local_map_frame_id").get_parameter_value().string_value.strip("/")
+        )
+        self.local_map_frame_id = configured_local_map_frame
+        if not self.local_map_frame_id and self.robot_id >= 0:
+            self.local_map_frame_id = f"robot{self.robot_id}_map"
+        self.use_local_map_frame = bool(self.get_parameter("use_local_map_frame").value)
         self.max_anchor_time_diff = float(self.get_parameter("max_anchor_time_diff_sec").value)
         self.odom_buffer_size = int(self.get_parameter("odom_buffer_size").value)
         self.publish_on_odom = bool(self.get_parameter("publish_on_odom").value)
@@ -123,12 +157,16 @@ class CslamOdomTfBridge(Node):
         self.global_frame_id: Optional[str] = None
         self.odom_frame_id: Optional[str] = None
         self.base_frame_id: Optional[str] = None
+        self.origin_to_local_translation: Optional[Vector3] = None
+        self.origin_to_local_rotation: Optional[Quaternion] = None
+        self.origin_map_frame_id: Optional[str] = None
         self.anchor_count = 0
         self.pending_anchor_update = False
         self.previous_optimizer_state: Optional[int] = None
         self._warned_missing_odom = False
         self._warned_frame_mismatch = False
         self._warned_time_diff = False
+        self._warned_missing_reference = False
 
         self.create_subscription(Odometry, self.odom_topic, self._odom_callback, 20)
         self.create_subscription(PoseStamped, self.cslam_pose_topic, self._cslam_pose_callback, 20)
@@ -138,12 +176,25 @@ class CslamOdomTfBridge(Node):
             self._optimizer_state_callback,
             20,
         )
+        reference_qos = QoSProfile(depth=1)
+        reference_qos.reliability = ReliabilityPolicy.RELIABLE
+        reference_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self.create_subscription(
+            ReferenceFrames,
+            self.reference_frames_topic,
+            self._reference_frames_callback,
+            reference_qos,
+        )
 
         self.get_logger().info(
             "CSLAM TF bridge started: "
             f"cslam_pose_topic='{self.cslam_pose_topic}', "
             f"optimizer_state_topic='{self.optimizer_state_topic}', "
+            f"reference_frames_topic='{self.reference_frames_topic}', "
             f"odom_topic='{self.odom_topic}', "
+            f"robot_id={self.robot_id}, "
+            f"local_map_frame_id='{self.local_map_frame_id}', "
+            f"use_local_map_frame={self.use_local_map_frame}, "
             f"max_anchor_time_diff_sec={self.max_anchor_time_diff:.3f}, "
             f"odom_buffer_size={self.odom_buffer_size}, "
             f"initialize_anchor_from_first_pose={self.initialize_anchor_from_first_pose}"
@@ -192,6 +243,12 @@ class CslamOdomTfBridge(Node):
         self._warned_time_diff = False
 
         global_translation, global_rotation = pose_from_pose_msg(pose_msg.pose)
+        global_frame_id = pose_msg.header.frame_id.strip("/")
+        global_translation, global_rotation, global_frame_id = self._resolve_local_map_pose(
+            global_translation,
+            global_rotation,
+            global_frame_id,
+        )
         odom_translation, odom_rotation = pose_from_pose_msg(odom_msg.pose.pose)
         odom_inv_translation, odom_inv_rotation = invert_pose(odom_translation, odom_rotation)
         map_to_odom_translation, map_to_odom_rotation = compose_pose(
@@ -203,7 +260,7 @@ class CslamOdomTfBridge(Node):
 
         self.map_to_odom_translation = map_to_odom_translation
         self.map_to_odom_rotation = map_to_odom_rotation
-        self.global_frame_id = pose_msg.header.frame_id
+        self.global_frame_id = global_frame_id
 
         if self.odom_frame_id is not None and self.odom_frame_id != odom_msg.header.frame_id:
             self._warned_frame_mismatch = False
@@ -260,6 +317,62 @@ class CslamOdomTfBridge(Node):
 
         if self.publish_on_odom:
             self._publish_map_to_odom(msg.header.stamp)
+
+    def _reference_frames_callback(self, msg: ReferenceFrames) -> None:
+        if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
+            return
+
+        header_frame = msg.origin_to_local.header.frame_id.strip("/")
+        child_frame = msg.origin_to_local.child_frame_id.strip("/")
+        if not header_frame or not child_frame:
+            return
+
+        if self.local_map_frame_id and child_frame != self.local_map_frame_id:
+            return
+
+        self.origin_map_frame_id = header_frame
+        self.local_map_frame_id = child_frame
+        self.origin_to_local_translation, self.origin_to_local_rotation = pose_from_transform_msg(
+            msg.origin_to_local.transform
+        )
+        self._warned_missing_reference = False
+        self.pending_anchor_update = True
+
+    def _resolve_local_map_pose(
+        self,
+        translation: Vector3,
+        rotation: Quaternion,
+        frame_id: str,
+    ) -> Tuple[Vector3, Quaternion, str]:
+        if not self.use_local_map_frame or not self.local_map_frame_id:
+            return translation, rotation, frame_id
+        if frame_id == self.local_map_frame_id:
+            return translation, rotation, frame_id
+        if (
+            self.origin_to_local_translation is None
+            or self.origin_to_local_rotation is None
+            or self.origin_map_frame_id != frame_id
+        ):
+            if not self._warned_missing_reference:
+                self.get_logger().warn(
+                    "Cannot express CSLAM pose in the local map frame yet: "
+                    f"pose_frame='{frame_id}', local_map_frame_id='{self.local_map_frame_id}', "
+                    f"known_origin_frame='{self.origin_map_frame_id}'. Using incoming frame for now."
+                )
+                self._warned_missing_reference = True
+            return translation, rotation, frame_id
+
+        local_to_origin_translation, local_to_origin_rotation = invert_pose(
+            self.origin_to_local_translation,
+            self.origin_to_local_rotation,
+        )
+        local_translation, local_rotation = compose_pose(
+            local_to_origin_translation,
+            local_to_origin_rotation,
+            translation,
+            rotation,
+        )
+        return local_translation, local_rotation, self.local_map_frame_id
 
     def _cslam_pose_callback(self, msg: PoseStamped) -> None:
         if self.pending_anchor_update:

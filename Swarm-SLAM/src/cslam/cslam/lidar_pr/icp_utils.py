@@ -100,7 +100,8 @@ def downsample(points, voxel_size):
     return open3d_cloud.voxel_down_sample(voxel_size=voxel_size)
 
 
-def solve_teaser(src, dst, voxel_size, min_inliers):
+def solve_teaser(src, dst, voxel_size, min_inliers, min_fitness=0.0,
+                 max_rmse=float("inf")):
     if len(src.points) == 0 or len(dst.points) == 0:
         rclpy.logging.get_logger('cslam').info(
             'Failed to compute loop closure. Empty point cloud received.')
@@ -141,6 +142,16 @@ def solve_teaser(src, dst, voxel_size, min_inliers):
             ),
             open3d.pipelines.registration.ICPConvergenceCriteria(
                 max_iteration=100))
+        if icp_sol.fitness < min_fitness:
+            rclpy.logging.get_logger('cslam').info(
+                'Failed to compute loop closure. ICP fitness too low '
+                f'( {icp_sol.fitness:.4f} < {min_fitness:.4f} )')
+            return False, None, None
+        if icp_sol.inlier_rmse > max_rmse:
+            rclpy.logging.get_logger('cslam').info(
+                'Failed to compute loop closure. ICP RMSE too high '
+                f'( {icp_sol.inlier_rmse:.4f} > {max_rmse:.4f} )')
+            return False, None, None
         T_icp = icp_sol.transformation
         solution.translation = T_icp[:3, 3]
         solution.rotation = T_icp[:3, :3]
@@ -188,7 +199,8 @@ def downsample_ros_pointcloud(pc_msg, voxel_size):
     points = ros_pointcloud_to_points(pc_msg)
     return downsample(points, voxel_size)
 
-def compute_transform(src, dst, voxel_size, min_inliers):
+def compute_transform(src, dst, voxel_size, min_inliers, min_fitness=0.0,
+                      max_rmse=float("inf")):
     """Computes a 3D transform between 2 point clouds using TEASER++.
 
     Returns the transform that maps ``src`` onto ``dst``.
@@ -204,8 +216,8 @@ def compute_transform(src, dst, voxel_size, min_inliers):
     Returns:
         (Transform, bool): transform and success flag
     """
-    valid, translation, rotation = solve_teaser(src, dst, voxel_size,
-                                                min_inliers)
+    valid, translation, rotation = solve_teaser(
+        src, dst, voxel_size, min_inliers, min_fitness, max_rmse)
     if not valid or translation is None or rotation is None:
         transform = Transform()
         transform.rotation.w = 1.0

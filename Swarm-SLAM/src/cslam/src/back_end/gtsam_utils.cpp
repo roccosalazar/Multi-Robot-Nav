@@ -75,9 +75,11 @@ gtsam_factors_to_msg(const gtsam::NonlinearFactorGraph &factors) {
       edge_msg.measurement = gtsam_pose_to_msg(factor->measured());
 
       gtsam::SharedNoiseModel model = factor->noiseModel();
-      auto noise =
-          boost::dynamic_pointer_cast<gtsam::noiseModel::Diagonal>(model);
-      auto sigmas = noise->sigmas();
+      if (auto robust_noise =
+              boost::dynamic_pointer_cast<gtsam::noiseModel::Robust>(model)) {
+        model = robust_noise->noise();
+      }
+      auto sigmas = model->sigmas();
       for (unsigned int i = 0; i < 6; i++) {
         edge_msg.noise_std[i] = sigmas[i];
       }

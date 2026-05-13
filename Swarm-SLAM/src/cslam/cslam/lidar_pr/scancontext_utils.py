@@ -32,11 +32,15 @@ def pt2rs(point, gap_ring, gap_sector, num_ring, num_sector):
     theta = xy2theta(x, y)
     faraway = np.sqrt(x*x + y*y)
     
-    idx_ring = np.divmod(faraway, gap_ring)[0]       
+    idx_ring = np.divmod(faraway, gap_ring)[0]
     idx_sector = np.divmod(theta, gap_sector)[0]
 
     if(idx_ring >= num_ring):
         idx_ring = num_ring-1 # python starts with 0 and ends with N-1
+    if(idx_sector >= num_sector):
+        idx_sector = num_sector-1
+    elif(idx_sector < 0):
+        idx_sector = 0
     
     return int(idx_ring), int(idx_sector)
 

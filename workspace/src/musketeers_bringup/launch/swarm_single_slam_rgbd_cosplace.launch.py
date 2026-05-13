@@ -92,7 +92,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'pose_graph_viewer_output_topic',
-        default_value='/cslam_rviz/pose_graph_markers',
+        default_value='cslam_rviz/pose_graph_markers',
         description='Output MarkerArray topic for the pose graph viewer.',
     ),
     DeclareLaunchArgument(
@@ -122,7 +122,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'keyframe_cloud_output_topic',
-        default_value='/cslam_rviz/map_points',
+        default_value='cslam_rviz/map_points',
         description='Output PointCloud2 topic for the CSLAM global map viewer.',
     ),
     DeclareLaunchArgument(
@@ -262,8 +262,13 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
             {
                 'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
                 'cslam_pose_topic': 'cslam/current_pose_estimate',
+                'reference_frames_topic': 'cslam/reference_frames',
                 'odom_topic': 'scan_matching_odometry/odom',
+                'robot_id': _get_launch_int(context, 'robot_id'),
+                'local_map_frame_id': f"robot{_get_launch_int(context, 'robot_id')}_map",
+                'use_local_map_frame': True,
                 'max_anchor_time_diff_sec': 2.0,
+                'initialize_anchor_from_first_pose': False,
             }
         ],
         arguments=log_args,
@@ -296,8 +301,10 @@ def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluatio
         ),
         launch_arguments={
             'use_sim_time': _get_launch_value(context, 'use_sim_time'),
+            'namespace': _get_launch_value(context, 'robot_name'),
             'input_topic': _get_launch_value(context, 'pose_graph_viewer_input_topic'),
             'output_topic': _get_launch_value(context, 'pose_graph_viewer_output_topic'),
+            'robot_id': _get_launch_value(context, 'robot_id'),
             'node_scale': _get_launch_value(context, 'pose_graph_viewer_node_scale'),
             'edge_width': _get_launch_value(context, 'pose_graph_viewer_edge_width'),
         }.items(),
@@ -319,6 +326,7 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
         package='slam_evaluation',
         executable='cslam_keyframe_cloud_viewer',
         name='cslam_keyframe_cloud_viewer',
+        namespace=_get_launch_value(context, 'robot_name'),
         output='screen',
         parameters=[
             {
@@ -327,6 +335,7 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
                 'keyframe_cloud_topic': _get_launch_value(context, 'keyframe_cloud_topic'),
                 'keyframe_odom_topic': _get_launch_value(context, 'keyframe_odom_topic'),
                 'output_topic': _get_launch_value(context, 'keyframe_cloud_output_topic'),
+                'robot_id': _get_launch_int(context, 'robot_id'),
                 'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
                 'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
                 'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),

@@ -183,7 +183,14 @@ class LidarHandler:
                 frame_ids.append(msg.matches_keyframe_id[i])
         for frame_id in frame_ids:
             pc = self.local_descriptors_map[frame_id]
-            transform, success = icp_utils.compute_transform(pc, icp_utils.ros_to_open3d(msg.data), self.params["frontend.voxel_size"], self.params["frontend.registration_min_inliers"])
+            transform, success = icp_utils.compute_transform(
+                pc,
+                icp_utils.ros_to_open3d(msg.data),
+                self.params["frontend.voxel_size"],
+                self.params["frontend.registration_min_inliers"],
+                self.params["frontend.registration_min_fitness"],
+                self.params["frontend.registration_max_rmse"],
+            )
             out_msg = InterRobotLoopClosure()
             out_msg.robot0_id = self.params["robot_id"]
             out_msg.robot0_keyframe_id = frame_id
@@ -201,7 +208,14 @@ class LidarHandler:
         """
         pc0 = self.local_descriptors_map[msg.keyframe0_id]
         pc1 = self.local_descriptors_map[msg.keyframe1_id]
-        transform, success = icp_utils.compute_transform(pc0, pc1, self.params["frontend.voxel_size"], self.params["frontend.registration_min_inliers"])
+        transform, success = icp_utils.compute_transform(
+            pc0,
+            pc1,
+            self.params["frontend.voxel_size"],
+            self.params["frontend.registration_min_inliers"],
+            self.params["frontend.registration_min_fitness"],
+            self.params["frontend.registration_max_rmse"],
+        )
         out_msg = IntraRobotLoopClosure()
         out_msg.keyframe0_id = msg.keyframe0_id
         out_msg.keyframe1_id = msg.keyframe1_id
@@ -322,6 +336,8 @@ if __name__ == '__main__':
                         ('frontend.map_manager_process_period_ms', 100),
                         ('frontend.voxel_size', 0.5),
                         ('frontend.registration_min_inliers', 60),
+                        ('frontend.registration_min_fitness', 0.0),
+                        ('frontend.registration_max_rmse', 1.0),
                         ('frontend.keyframe_generation_ratio_distance', 0.5),
                         ('frontend.pointcloud_odom_approx_time_sync_s', 0.1),
                         ('robot_id', 0),           
@@ -342,6 +358,10 @@ if __name__ == '__main__':
         'frontend.voxel_size').value
     params['frontend.registration_min_inliers'] = node.get_parameter(
         'frontend.registration_min_inliers').value 
+    params['frontend.registration_min_fitness'] = node.get_parameter(
+        'frontend.registration_min_fitness').value
+    params['frontend.registration_max_rmse'] = node.get_parameter(
+        'frontend.registration_max_rmse').value
     params['frontend.keyframe_generation_ratio_distance'] = node.get_parameter(
         'frontend.keyframe_generation_ratio_distance').value
     params['frontend.pointcloud_odom_approx_time_sync_s'] = node.get_parameter(
