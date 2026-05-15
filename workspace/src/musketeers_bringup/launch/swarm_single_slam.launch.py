@@ -1,5 +1,6 @@
 from ament_index_python.packages import get_package_share_directory
 
+from datetime import datetime, timezone
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
 from launch.conditions import IfCondition
@@ -175,6 +176,27 @@ ARGUMENTS = [
         'merged_map_output_topic',
         default_value='cslam_rviz/merged_map_points',
         description='Output PointCloud2 topic for the cached merged map points.',
+    ),
+    DeclareLaunchArgument(
+        'start_evaluation_recorders',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start SLAM evaluation CSV recorders.',
+    ),
+    DeclareLaunchArgument(
+        'results_root',
+        default_value='',
+        description='Results root. Empty means <Multi-Robot-Nav>/results.',
+    ),
+    DeclareLaunchArgument(
+        'results_run_id',
+        default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'),
+        description='Shared results run id.',
+    ),
+    DeclareLaunchArgument(
+        'evaluation_run_type',
+        default_value='swarm_single',
+        description='Results subfolder for this launch.',
     ),
 ]
 
@@ -512,6 +534,20 @@ def generate_launch_description() -> LaunchDescription:
     It starts external mrg_slam odometry, direct CSLAM nodes and visualization tools.
     """
     pkg_slam_evaluation = get_package_share_directory('slam_evaluation')
+    recorders_launch = PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'slam_recorders.launch.py'])
+    recorders = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(recorders_launch),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'robot_names': LaunchConfiguration('robot_name'),
+            'results_root': LaunchConfiguration('results_root'),
+            'run_type': LaunchConfiguration('evaluation_run_type'),
+            'run_id': LaunchConfiguration('results_run_id'),
+            'graph_mode': 'swarm',
+            'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
+    )
 
     launch_description = LaunchDescription(ARGUMENTS)
     launch_description.add_action(_create_lidar_odometry_action())
@@ -524,5 +560,6 @@ def generate_launch_description() -> LaunchDescription:
         OpaqueFunction(function=_delayed_merged_pose_graph_viewer_action, args=[pkg_slam_evaluation])
     )
     launch_description.add_action(OpaqueFunction(function=_delayed_merged_keyframe_cloud_viewer_action))
+    launch_description.add_action(recorders)
 
     return launch_description

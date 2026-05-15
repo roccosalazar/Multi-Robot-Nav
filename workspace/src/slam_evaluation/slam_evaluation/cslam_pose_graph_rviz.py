@@ -22,12 +22,14 @@ class CSLAMPoseGraphRViz(Node):
         self.declare_parameter('robot_id', -1)
         self.declare_parameter('node_scale', 0.30)
         self.declare_parameter('edge_width', 0.05)
+        self.declare_parameter('aggregate_pose_graphs', False)
 
         self.input_topic = str(self.get_parameter('input_topic').value)
         self.output_topic = str(self.get_parameter('output_topic').value)
         self.robot_id = int(self.get_parameter('robot_id').value)
         self.node_scale = float(self.get_parameter('node_scale').value)
         self.edge_width = float(self.get_parameter('edge_width').value)
+        self.aggregate_pose_graphs = bool(self.get_parameter('aggregate_pose_graphs').value)
 
         sub_qos = QoSProfile(depth=10)
         sub_qos.reliability = ReliabilityPolicy.RELIABLE
@@ -46,22 +48,83 @@ class CSLAMPoseGraphRViz(Node):
 
         self._last_frame_id = None
         self._published_graph_count = 0
+        self._pose_graph_cache: Dict[int, PoseGraph] = {}
 
         self.get_logger().info(
             "Publishing RViz markers from '%s' to '%s' using frame 'robot{origin_robot_id}_map' "
-            "for robot_id=%d (-1 means all robots)."
-            % (self.input_topic, self.output_topic, self.robot_id)
+            "for robot_id=%d (-1 means all robots), aggregate_pose_graphs=%s."
+            % (self.input_topic, self.output_topic, self.robot_id, self.aggregate_pose_graphs)
         )
 
     def _pose_graph_callback(self, msg: PoseGraph) -> None:
+        if self.aggregate_pose_graphs:
+            self._aggregate_pose_graph_callback(msg)
+            return
+
         if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
             return
 
-        frame_id = self._frame_id_from_msg(msg)
+        self._publish_markers(
+            source_robot_id=int(msg.robot_id),
+            origin_robot_id=int(msg.origin_robot_id),
+            values=msg.values,
+            edges=msg.edges,
+            source_robots=[int(msg.robot_id)],
+        )
+
+    def _aggregate_pose_graph_callback(self, msg: PoseGraph) -> None:
+        source_robot_id = int(msg.robot_id)
+        self._pose_graph_cache[source_robot_id] = msg
+
+        target_origin_id = self._target_origin_robot_id()
+        if target_origin_id is None:
+            return
+
+        values = []
+        edges = []
+        source_robots = []
+
+        for robot_id, cached_msg in sorted(self._pose_graph_cache.items()):
+            if int(cached_msg.origin_robot_id) != target_origin_id:
+                continue
+            source_robots.append(robot_id)
+            values.extend(cached_msg.values)
+            edges.extend(cached_msg.edges)
+
+        self._publish_markers(
+            source_robot_id=self.robot_id if self.robot_id >= 0 else source_robot_id,
+            origin_robot_id=target_origin_id,
+            values=values,
+            edges=edges,
+            source_robots=source_robots,
+        )
+
+    def _target_origin_robot_id(self):
+        if self.robot_id >= 0:
+            reference_graph = self._pose_graph_cache.get(self.robot_id)
+            if reference_graph is None:
+                return None
+            return int(reference_graph.origin_robot_id)
+
+        if not self._pose_graph_cache:
+            return None
+
+        latest_source_robot = sorted(self._pose_graph_cache.keys())[-1]
+        return int(self._pose_graph_cache[latest_source_robot].origin_robot_id)
+
+    def _publish_markers(
+        self,
+        source_robot_id: int,
+        origin_robot_id: int,
+        values,
+        edges,
+        source_robots: List[int],
+    ) -> None:
+        frame_id = self._frame_id_from_origin(origin_robot_id)
         if frame_id != self._last_frame_id:
             self.get_logger().info(
                 "Using frame '%s' derived from origin_robot_id=%d."
-                % (frame_id, msg.origin_robot_id)
+                % (frame_id, origin_robot_id)
             )
             self._last_frame_id = frame_id
 
@@ -69,7 +132,7 @@ class CSLAMPoseGraphRViz(Node):
         keyframe_positions: Dict[Tuple[int, int], Point] = {}
         node_points_by_robot: Dict[int, List[Point]] = {}
 
-        for value in msg.values:
+        for value in values:
             point = Point(
                 x=float(value.pose.position.x),
                 y=float(value.pose.position.y),
@@ -83,7 +146,7 @@ class CSLAMPoseGraphRViz(Node):
         intra_robot_loop_segments: List[Point] = []
         inter_robot_segments: List[Point] = []
 
-        for edge in msg.edges:
+        for edge in edges:
             key_from = (int(edge.key_from.robot_id), int(edge.key_from.keyframe_id))
             key_to = (int(edge.key_to.robot_id), int(edge.key_to.keyframe_id))
 
@@ -162,13 +225,14 @@ class CSLAMPoseGraphRViz(Node):
             self.get_logger().info(
                 "Published pose graph markers "
                 "source_robot_id=%d origin_robot_id=%d values=%d edges=%d "
-                "node_counts={%s} odom_edge_segments=%d loop_edge_segments=%d "
+                "cached_source_robots=%s node_counts={%s} odom_edge_segments=%d loop_edge_segments=%d "
                 "inter_robot_segments=%d frame='%s'"
                 % (
-                    int(msg.robot_id),
-                    int(msg.origin_robot_id),
-                    len(msg.values),
-                    len(msg.edges),
+                    source_robot_id,
+                    origin_robot_id,
+                    len(values),
+                    len(edges),
+                    source_robots,
                     node_counts,
                     len(intra_robot_odom_segments) // 2,
                     len(intra_robot_loop_segments) // 2,
@@ -178,7 +242,10 @@ class CSLAMPoseGraphRViz(Node):
             )
 
     def _frame_id_from_msg(self, msg: PoseGraph) -> str:
-        return f'robot{int(msg.origin_robot_id)}_map'
+        return self._frame_id_from_origin(int(msg.origin_robot_id))
+
+    def _frame_id_from_origin(self, origin_robot_id: int) -> str:
+        return f'robot{origin_robot_id}_map'
 
     def _delete_all_marker(self) -> Marker:
         marker = Marker()

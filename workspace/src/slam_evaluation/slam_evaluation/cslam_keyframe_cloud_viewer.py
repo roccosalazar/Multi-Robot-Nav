@@ -141,6 +141,7 @@ class CslamKeyframeCloudViewer(Node):
         self.declare_parameter("voxel_size", 0.10)
         self.declare_parameter("publish_period_sec", 0.5)
         self.declare_parameter("update_only_when_subscribed", True)
+        self.declare_parameter("aggregate_pose_graphs", False)
 
         self.pose_graph_topic = self.get_parameter("pose_graph_topic").get_parameter_value().string_value
         self.keyframe_cloud_topic = self.get_parameter("keyframe_cloud_topic").get_parameter_value().string_value
@@ -152,8 +153,11 @@ class CslamKeyframeCloudViewer(Node):
         self.voxel_size = max(0.0, float(self.get_parameter("voxel_size").value))
         self.publish_period_sec = max(0.05, float(self.get_parameter("publish_period_sec").value))
         self.update_only_when_subscribed = bool(self.get_parameter("update_only_when_subscribed").value)
+        self.aggregate_pose_graphs = bool(self.get_parameter("aggregate_pose_graphs").value)
 
         self.optimized_pose_cache: Dict[Key, Pose] = {}
+        self.optimized_pose_cache_by_robot: Dict[int, Dict[Key, Pose]] = {}
+        self.origin_robot_id_by_robot: Dict[int, int] = {}
         self.odom_pose_cache: Dict[Key, Pose] = {}
         self.odom_frame_cache: Dict[Key, Tuple[str, str]] = {}
         self.cloud_cache: Dict[Key, np.ndarray] = {}
@@ -187,6 +191,7 @@ class CslamKeyframeCloudViewer(Node):
             f"keyframe_odom_topic='{self.keyframe_odom_topic}', "
             f"output_topic='{self.output_topic}', "
             f"robot_id={self.robot_id}, "
+            f"aggregate_pose_graphs={self.aggregate_pose_graphs}, "
             f"voxel_size={self.voxel_size:.3f}, "
             f"max_points_per_keyframe={self.max_points_per_keyframe}, "
             f"keyframe_stride={self.keyframe_stride}, "
@@ -303,6 +308,31 @@ class CslamKeyframeCloudViewer(Node):
     def _mark_dirty(self) -> None:
         self.map_dirty = True
 
+    def _target_origin_robot_id(self) -> Optional[int]:
+        if self.robot_id >= 0:
+            return self.origin_robot_id_by_robot.get(self.robot_id)
+
+        if not self.origin_robot_id_by_robot:
+            return None
+
+        latest_source_robot = sorted(self.origin_robot_id_by_robot.keys())[-1]
+        return self.origin_robot_id_by_robot[latest_source_robot]
+
+    def _refresh_aggregated_optimized_pose_cache(self) -> bool:
+        target_origin_id = self._target_origin_robot_id()
+        if target_origin_id is None:
+            return False
+
+        optimized_pose_cache: Dict[Key, Pose] = {}
+        for robot_id, robot_pose_cache in sorted(self.optimized_pose_cache_by_robot.items()):
+            if self.origin_robot_id_by_robot.get(robot_id) != target_origin_id:
+                continue
+            optimized_pose_cache.update(robot_pose_cache)
+
+        self.optimized_pose_cache = optimized_pose_cache
+        self.global_frame_id = f"robot{target_origin_id}_map"
+        return True
+
     def _build_world_cloud(self) -> np.ndarray:
         visible_keys = sorted(self.cloud_cache.keys())
         world_chunks = []
@@ -398,6 +428,10 @@ class CslamKeyframeCloudViewer(Node):
             )
 
     def _pose_graph_callback(self, msg: PoseGraph) -> None:
+        if self.aggregate_pose_graphs:
+            self._aggregate_pose_graph_callback(msg)
+            return
+
         if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
             return
 
@@ -427,8 +461,42 @@ class CslamKeyframeCloudViewer(Node):
                 f"frame='{self.global_frame_id}'"
             )
 
+    def _aggregate_pose_graph_callback(self, msg: PoseGraph) -> None:
+        source_robot_id = int(msg.robot_id)
+        current_poses: Dict[Key, Pose] = {}
+
+        for value in msg.values:
+            key = (int(value.key.robot_id), int(value.key.keyframe_id))
+            current_poses[key] = pose_from_pose_msg(value.pose)
+
+        self.optimized_pose_cache_by_robot[source_robot_id] = current_poses
+        self.origin_robot_id_by_robot[source_robot_id] = int(msg.origin_robot_id)
+
+        if not self._refresh_aggregated_optimized_pose_cache():
+            return
+
+        self._refresh_map_to_odom_transform()
+        self.last_cloud_stamp = self.get_clock().now().to_msg()
+        self._mark_dirty()
+        self.pose_graph_msg_counter += 1
+
+        if self.pose_graph_msg_counter <= 5 or self.pose_graph_msg_counter % 20 == 0:
+            cached_source_robots = [
+                robot_id
+                for robot_id, origin_robot_id in sorted(self.origin_robot_id_by_robot.items())
+                if f"robot{origin_robot_id}_map" == self.global_frame_id
+            ]
+            self.get_logger().info(
+                "Received aggregated pose graph "
+                f"source_robot_id={source_robot_id} origin_robot_id={int(msg.origin_robot_id)} "
+                f"values={len(msg.values)} edges={len(msg.edges)} "
+                f"cached_source_robots={cached_source_robots} "
+                f"optimized_keys={len(self.optimized_pose_cache)} "
+                f"frame='{self.global_frame_id}'"
+            )
+
     def _keyframe_cloud_callback(self, msg: VizPointCloud) -> None:
-        if self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
+        if not self.aggregate_pose_graphs and self.robot_id >= 0 and int(msg.robot_id) != self.robot_id:
             return
 
         key = (int(msg.robot_id), int(msg.keyframe_id))

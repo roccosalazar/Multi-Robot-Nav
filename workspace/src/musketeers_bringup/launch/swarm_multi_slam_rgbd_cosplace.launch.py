@@ -2,8 +2,10 @@ from typing import Union
 
 from ament_index_python.packages import get_package_share_directory
 
+from datetime import datetime, timezone
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -150,6 +152,27 @@ ARGUMENTS = [
         default_value='0.5',
         description='Publish period in seconds for the fused global CSLAM map.',
     ),
+    DeclareLaunchArgument(
+        'start_evaluation_recorders',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Start aggregate SLAM evaluation CSV recorders.',
+    ),
+    DeclareLaunchArgument(
+        'results_root',
+        default_value='',
+        description='Results root. Empty means <Multi-Robot-Nav>/results.',
+    ),
+    DeclareLaunchArgument(
+        'results_run_id',
+        default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'),
+        description='Shared results run id.',
+    ),
+    DeclareLaunchArgument(
+        'evaluation_run_type',
+        default_value='multi_data_run',
+        description='Results subfolder for this launch.',
+    ),
 ]
 
 
@@ -192,17 +215,20 @@ def _create_swarm_single_slam_instance(
             'keyframe_stride': LaunchConfiguration('keyframe_stride'),
             'keyframe_cloud_voxel_size': LaunchConfiguration('keyframe_cloud_voxel_size'),
             'keyframe_cloud_publish_period_sec': LaunchConfiguration('keyframe_cloud_publish_period_sec'),
+            'start_evaluation_recorders': 'false',
         }.items(),
     )
 
 
 def generate_launch_description() -> LaunchDescription:
     pkg_musketeers_bringup = get_package_share_directory('musketeers_bringup')
+    pkg_slam_evaluation = get_package_share_directory('slam_evaluation')
     swarm_single_slam_launch = PathJoinSubstitution([
         pkg_musketeers_bringup,
         'launch',
         'swarm_single_slam_rgbd_cosplace.launch.py',
     ])
+    recorders_launch = PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'slam_recorders.launch.py'])
 
     launch_description = LaunchDescription(ARGUMENTS)
 
@@ -216,5 +242,21 @@ def generate_launch_description() -> LaunchDescription:
                 start_cloud_viewer=LaunchConfiguration('start_cloud_viewer'),
             )
         )
+
+    launch_description.add_action(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(recorders_launch),
+            launch_arguments={
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'robot_names': ','.join(robot_name for robot_name, _ in ROBOT_CONFIGS),
+                'results_root': LaunchConfiguration('results_root'),
+                'run_type': LaunchConfiguration('evaluation_run_type'),
+                'run_id': LaunchConfiguration('results_run_id'),
+                'graph_mode': 'swarm',
+                'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
+            }.items(),
+            condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
+        )
+    )
 
     return launch_description

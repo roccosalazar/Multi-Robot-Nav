@@ -1,10 +1,12 @@
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
+from launch.conditions import IfCondition
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from datetime import datetime, timezone
 
 
 ARGUMENTS = [
@@ -22,12 +24,19 @@ ARGUMENTS = [
     DeclareLaunchArgument('base_frame', default_value='base_link', description='Base frame name.'),
     DeclareLaunchArgument('publish_rate', default_value='20.0', description='Publish rate [Hz] for slam pose publisher.'),
     DeclareLaunchArgument('lookup_timeout_sec', default_value='0.1', description='TF lookup timeout [s].'),
+    DeclareLaunchArgument('start_evaluation_recorders', default_value='true', choices=['true', 'false'], description='Start SLAM evaluation CSV recorders.'),
+    DeclareLaunchArgument('results_root', default_value='', description='Results root. Empty means <Multi-Robot-Nav>/results.'),
+    DeclareLaunchArgument('results_run_id', default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'), description='Shared results run id.'),
+    DeclareLaunchArgument('evaluation_run_type', default_value='mrg', description='Results subfolder for this launch.'),
+    DeclareLaunchArgument('mrg_graph_record_period_sec', default_value='1.0', description='Polling period for MRG graph snapshots.'),
 ]
 
 
 def generate_launch_description() -> LaunchDescription:
     pkg_mrg_slam = get_package_share_directory('mrg_slam')
+    pkg_slam_evaluation = get_package_share_directory('slam_evaluation')
     mrg_slam_launch = PathJoinSubstitution([pkg_mrg_slam, 'launch', 'mrg_slam.launch.py'])
+    recorders_launch = PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'slam_recorders.launch.py'])
 
     slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(mrg_slam_launch),
@@ -63,7 +72,22 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    recorders = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(recorders_launch),
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'robot_names': LaunchConfiguration('robot_name'),
+            'results_root': LaunchConfiguration('results_root'),
+            'run_type': LaunchConfiguration('evaluation_run_type'),
+            'run_id': LaunchConfiguration('results_run_id'),
+            'graph_mode': 'mrg',
+            'mrg_poll_period_sec': LaunchConfiguration('mrg_graph_record_period_sec'),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
+    )
+
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(slam)
     ld.add_action(slam_pose_publisher)
+    ld.add_action(recorders)
     return ld

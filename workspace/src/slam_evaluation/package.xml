@@ -10,6 +10,7 @@
   <depend>rclpy</depend>
   <depend>cslam_common_interfaces</depend>
   <depend>geometry_msgs</depend>
+  <depend>mrg_slam_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>

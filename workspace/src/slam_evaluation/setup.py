@@ -32,6 +32,11 @@ setup(
             'cslam_keyframe_cloud_viewer = slam_evaluation.cslam_keyframe_cloud_viewer:main',
             'slam_pose_publisher = slam_evaluation.slam_pose_publisher:main',
             'cslam_pose_graph_rviz = slam_evaluation.cslam_pose_graph_rviz:main',
+            (
+                'ground_truth_trajectory_recorder = '
+                'slam_evaluation.ground_truth_trajectory_recorder:main'
+            ),
+            'pose_graph_recorder = slam_evaluation.pose_graph_recorder:main',
         ],
     },
 )

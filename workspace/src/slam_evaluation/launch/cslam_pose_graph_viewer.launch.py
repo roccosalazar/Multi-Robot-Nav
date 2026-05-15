@@ -46,6 +46,12 @@ ARGUMENTS = [
         default_value='0.05',
         description='Line width for pose-graph edges [m].',
     ),
+    DeclareLaunchArgument(
+        'aggregate_pose_graphs',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Aggregate per-robot PoseGraph messages that share the reference robot origin.',
+    ),
 ]
 
 
@@ -64,6 +70,7 @@ def generate_launch_description() -> LaunchDescription:
                 'robot_id': LaunchConfiguration('robot_id'),
                 'node_scale': LaunchConfiguration('node_scale'),
                 'edge_width': LaunchConfiguration('edge_width'),
+                'aggregate_pose_graphs': LaunchConfiguration('aggregate_pose_graphs'),
             }
         ],
     )
