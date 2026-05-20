@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import csv
 from dataclasses import dataclass
 import hashlib
@@ -10,7 +11,7 @@ from pathlib import Path
 import time
 from typing import Dict, TextIO
 
-from cslam_common_interfaces.msg import PoseGraph
+from cslam_common_interfaces.msg import KeyframeOdom, PoseGraph
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
@@ -69,6 +70,8 @@ class PoseGraphRecorder(Node):
         'source',
         'robot_id',
         'keyframe_id',
+        'stamp_sec',
+        'stamp_nsec',
         'position_x',
         'position_y',
         'position_z',
@@ -156,7 +159,12 @@ class PoseGraphRecorder(Node):
             'swarm_pose_graph_topics',
             '/cslam/viz/pose_graph',
         )
-        self.declare_parameter('swarm_record_merged_graphs', True)
+        self.declare_parameter('swarm_record_merged_graphs', False)
+        self.declare_parameter('swarm_robot_centric_global_graphs', True)
+        self.declare_parameter(
+            'swarm_keyframe_odom_topic_template',
+            '/{robot_name}/cslam/keyframe_odom',
+        )
         self.declare_parameter('mrg_poll_period_sec', 1.0)
         self.declare_parameter('signature_precision', 9)
 
@@ -189,6 +197,13 @@ class PoseGraphRecorder(Node):
         self._mrg_pending = {}
         self._mrg_statuses = {}
         self._mrg_last_service_warn: Dict[str, float] = {}
+        self._swarm_pose_graph_cache: Dict[int, PoseGraph] = {}
+        self._swarm_keyframe_stamps: Dict[
+            tuple[int, int], tuple[int, int]
+        ] = {}
+        self._swarm_robot_centric_global_graphs = self._as_bool(
+            self.get_parameter('swarm_robot_centric_global_graphs').value
+        )
 
         if self.mode in ('auto', 'swarm'):
             self._start_swarm_recording()
@@ -257,6 +272,70 @@ class PoseGraphRecorder(Node):
                 f"topic='{topic}'"
             )
 
+        self._start_swarm_keyframe_odom_recording(qos)
+
+    def _start_swarm_keyframe_odom_recording(self, qos: QoSProfile) -> None:
+        topic_template = str(
+            self.get_parameter('swarm_keyframe_odom_topic_template').value
+        ).strip()
+        if not topic_template:
+            return
+
+        unique_topics = set()
+        for robot_name in self.robot_names:
+            robot_id = self._robot_id_from_name(robot_name)
+            if robot_id is None:
+                self.file_logger.warn(
+                    "Skipping Swarm keyframe timestamp recording for "
+                    f"robot_name='{robot_name}' because no numeric robot id "
+                    "could be inferred."
+                )
+                continue
+
+            try:
+                topic = topic_template.format(
+                    robot_name=robot_name,
+                    robot_id=robot_id,
+                )
+            except Exception as exc:
+                self.file_logger.error(
+                    "Invalid swarm_keyframe_odom_topic_template "
+                    f"'{topic_template}': {exc}"
+                )
+                return
+
+            normalized_topic = topic if topic.startswith('/') else f'/{topic}'
+            if normalized_topic in unique_topics:
+                continue
+            unique_topics.add(normalized_topic)
+
+            self._subscriptions.append(
+                self.create_subscription(
+                    KeyframeOdom,
+                    normalized_topic,
+                    lambda msg, rid=robot_id, top=normalized_topic: (
+                        self._swarm_keyframe_odom_callback(msg, rid, top)
+                    ),
+                    qos,
+                )
+            )
+            self.file_logger.info(
+                "Recording Swarm keyframe timestamps "
+                f"robot_id={robot_id} topic='{normalized_topic}'"
+            )
+
+    def _swarm_keyframe_odom_callback(
+        self,
+        msg: KeyframeOdom,
+        robot_id: int,
+        topic: str,
+    ) -> None:
+        del topic
+        self._swarm_keyframe_stamps[(int(robot_id), int(msg.id))] = (
+            int(msg.odom.header.stamp.sec),
+            int(msg.odom.header.stamp.nanosec),
+        )
+
     def _source_name_from_swarm_topic(self, topic: str) -> str:
         stripped = topic.strip('/')
         parts = stripped.split('/')
@@ -312,15 +391,89 @@ class PoseGraphRecorder(Node):
         source: str,
         topic: str,
     ) -> None:
-        effective_source = source
         if source == 'swarm_global_pose_graph':
-            effective_source = f'{source}_robot{int(msg.robot_id)}'
+            self._save_swarm_global_pose_graph_snapshots(msg, topic)
+            return
+
         self._save_swarm_snapshot(
             msg,
-            effective_source,
+            source,
             topic,
             'topic_update',
         )
+
+    def _save_swarm_global_pose_graph_snapshots(
+        self,
+        msg: PoseGraph,
+        topic: str,
+    ) -> None:
+        source_robot_id = int(msg.robot_id)
+        self._swarm_pose_graph_cache[source_robot_id] = copy.deepcopy(msg)
+
+        if not self._swarm_robot_centric_global_graphs:
+            self._save_swarm_snapshot(
+                msg,
+                f'swarm_global_pose_graph_robot{source_robot_id}',
+                topic,
+                'topic_update',
+            )
+            return
+
+        target_robot_ids = []
+        for robot_name in self.robot_names:
+            robot_id = self._robot_id_from_name(robot_name)
+            if robot_id is not None:
+                target_robot_ids.append(robot_id)
+
+        if not target_robot_ids:
+            target_robot_ids = sorted(self._swarm_pose_graph_cache.keys())
+
+        for target_robot_id in sorted(set(target_robot_ids)):
+            aggregated_msg = self._build_robot_centric_pose_graph(
+                target_robot_id
+            )
+            if aggregated_msg is None:
+                continue
+            self._save_swarm_snapshot(
+                aggregated_msg,
+                f'swarm_global_pose_graph_robot{target_robot_id}',
+                topic,
+                'topic_update_robot_centric',
+            )
+
+    def _build_robot_centric_pose_graph(
+        self,
+        target_robot_id: int,
+    ) -> PoseGraph | None:
+        reference_graph = self._swarm_pose_graph_cache.get(target_robot_id)
+        if reference_graph is None:
+            return None
+
+        target_origin_id = int(reference_graph.origin_robot_id)
+        aggregated_msg = PoseGraph()
+        aggregated_msg.robot_id = target_robot_id
+        aggregated_msg.origin_robot_id = target_origin_id
+
+        connected_robot_ids = set()
+
+        for robot_id, cached_msg in sorted(self._swarm_pose_graph_cache.items()):
+            if int(cached_msg.origin_robot_id) != target_origin_id:
+                continue
+            aggregated_msg.values.extend(copy.deepcopy(cached_msg.values))
+            aggregated_msg.edges.extend(copy.deepcopy(cached_msg.edges))
+            connected_robot_ids.add(robot_id)
+            for connected_robot_id in cached_msg.connected_robots.ids:
+                connected_robot_ids.add(int(connected_robot_id))
+
+        connected_robot_ids.discard(target_robot_id)
+        aggregated_msg.connected_robots.ids.extend(sorted(connected_robot_ids))
+        return aggregated_msg
+
+    def _robot_id_from_name(self, robot_name: str) -> int | None:
+        stripped = robot_name.strip().lower()
+        if stripped.startswith('r') and stripped[1:].isdigit():
+            return int(stripped[1:])
+        return None
 
     def _mrg_status_callback(self, msg, robot_name: str) -> None:
         previous = self._mrg_statuses.get(robot_name)
@@ -452,12 +605,18 @@ class PoseGraphRecorder(Node):
                     item.key.keyframe_id,
                 ),
             ):
+                robot_id = int(value.key.robot_id)
+                keyframe_id = int(value.key.keyframe_id)
+                stamp = self._swarm_keyframe_stamp(robot_id, keyframe_id)
+                stamp_sec, stamp_nsec = stamp if stamp is not None else ('', '')
                 writer.writerow(
                     [
                         files.sequence,
                         source,
-                        int(value.key.robot_id),
-                        int(value.key.keyframe_id),
+                        robot_id,
+                        keyframe_id,
+                        stamp_sec,
+                        stamp_nsec,
                         *self._pose_to_csv(value.pose),
                     ]
                 )
@@ -658,6 +817,10 @@ class PoseGraphRecorder(Node):
             (
                 int(value.key.robot_id),
                 int(value.key.keyframe_id),
+                *self._swarm_keyframe_stamp_for_signature(
+                    int(value.key.robot_id),
+                    int(value.key.keyframe_id),
+                ),
                 *self._pose_to_signature(value.pose),
             )
             for value in msg.values
@@ -680,6 +843,25 @@ class PoseGraphRecorder(Node):
             'edges': sorted(edges),
         }
         return self._hash_payload(payload)
+
+    def _swarm_keyframe_stamp(
+        self,
+        robot_id: int,
+        keyframe_id: int,
+    ) -> tuple[int, int] | None:
+        return self._swarm_keyframe_stamps.get(
+            (int(robot_id), int(keyframe_id))
+        )
+
+    def _swarm_keyframe_stamp_for_signature(
+        self,
+        robot_id: int,
+        keyframe_id: int,
+    ) -> tuple[int | None, int | None]:
+        stamp = self._swarm_keyframe_stamp(robot_id, keyframe_id)
+        if stamp is None:
+            return None, None
+        return stamp
 
     def _mrg_signature(self, graph) -> str:
         nodes = [

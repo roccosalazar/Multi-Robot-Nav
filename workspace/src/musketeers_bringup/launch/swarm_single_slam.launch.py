@@ -103,6 +103,12 @@ ARGUMENTS = [
         description='Output MarkerArray topic for the pose graph viewer.',
     ),
     DeclareLaunchArgument(
+        'robot_centric_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Aggregate CSLAM visualization topics into one MRG-style robot-centric view.',
+    ),
+    DeclareLaunchArgument(
         'pose_graph_viewer_node_scale',
         default_value='0.30',
         description='Sphere diameter for pose-graph nodes [m].',
@@ -176,6 +182,12 @@ ARGUMENTS = [
         'merged_map_output_topic',
         default_value='cslam_rviz/merged_map_points',
         description='Output PointCloud2 topic for the cached merged map points.',
+    ),
+    DeclareLaunchArgument(
+        'initialize_anchor_from_first_pose',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Initialize the CSLAM map->odom anchor from the first pose sample.',
     ),
     DeclareLaunchArgument(
         'start_evaluation_recorders',
@@ -356,7 +368,10 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
                 'local_map_frame_id': f"robot{_get_launch_int(context, 'robot_id')}_map",
                 'use_local_map_frame': True,
                 'max_anchor_time_diff_sec': 2.0,
-                'initialize_anchor_from_first_pose': False,
+                'initialize_anchor_from_first_pose': _get_launch_bool(
+                    context,
+                    'initialize_anchor_from_first_pose',
+                ),
             }
         ],
         arguments=log_args,
@@ -403,6 +418,7 @@ def _delayed_pose_graph_viewer_action(context: LaunchContext, pkg_slam_evaluatio
             'robot_id': _get_launch_value(context, 'robot_id'),
             'node_scale': _get_launch_value(context, 'pose_graph_viewer_node_scale'),
             'edge_width': _get_launch_value(context, 'pose_graph_viewer_edge_width'),
+            'aggregate_pose_graphs': _get_launch_value(context, 'robot_centric_viewer'),
         }.items(),
     )
 
@@ -436,6 +452,7 @@ def _delayed_keyframe_cloud_viewer_action(context: LaunchContext) -> list[TimerA
                 'keyframe_odom_topic': _get_launch_value(context, 'keyframe_odom_topic'),
                 'output_topic': _get_launch_value(context, 'keyframe_cloud_output_topic'),
                 'robot_id': _get_launch_int(context, 'robot_id'),
+                'aggregate_pose_graphs': _get_launch_bool(context, 'robot_centric_viewer'),
                 'point_scale': _get_launch_float(context, 'keyframe_point_scale'),
                 'max_points_per_keyframe': _get_launch_int(context, 'max_points_per_keyframe'),
                 'keyframe_stride': _get_launch_int(context, 'keyframe_stride'),
@@ -545,6 +562,7 @@ def generate_launch_description() -> LaunchDescription:
             'run_id': LaunchConfiguration('results_run_id'),
             'graph_mode': 'swarm',
             'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
+            'swarm_record_merged_graphs': 'false',
         }.items(),
         condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
     )

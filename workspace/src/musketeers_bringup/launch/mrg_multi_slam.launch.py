@@ -20,9 +20,10 @@ ARGUMENTS = [
     DeclareLaunchArgument('publish_rate', default_value='20.0', description='Publish rate [Hz] for slam pose publisher.'),
     DeclareLaunchArgument('lookup_timeout_sec', default_value='0.1', description='TF lookup timeout [s].'),
     DeclareLaunchArgument('start_evaluation_recorders', default_value='true', choices=['true', 'false'], description='Start aggregate SLAM evaluation CSV recorders.'),
+    DeclareLaunchArgument('start_aggregate_recorders', default_value='true', choices=['true', 'false'], description='Internal toggle for the shared multi-robot evaluation recorders.'),
     DeclareLaunchArgument('results_root', default_value='', description='Results root. Empty means <Multi-Robot-Nav>/results.'),
     DeclareLaunchArgument('results_run_id', default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'), description='Shared results run id.'),
-    DeclareLaunchArgument('evaluation_run_type', default_value='mrg', description='Results subfolder for this launch.'),
+    DeclareLaunchArgument('evaluation_run_type', default_value='mrg_multi', description='Results subfolder for this launch.'),
     DeclareLaunchArgument('mrg_graph_record_period_sec', default_value='1.0', description='Polling period for MRG graph snapshots.'),
 ]
 
@@ -70,7 +71,7 @@ def generate_launch_description() -> LaunchDescription:
             'graph_mode': 'mrg',
             'mrg_poll_period_sec': LaunchConfiguration('mrg_graph_record_period_sec'),
         }.items(),
-        condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
+        condition=IfCondition(LaunchConfiguration('start_aggregate_recorders')),
     )
 
     ld = LaunchDescription(ARGUMENTS)

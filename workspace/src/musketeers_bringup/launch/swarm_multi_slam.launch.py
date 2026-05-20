@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from datetime import datetime, timezone
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -109,6 +109,12 @@ ARGUMENTS = [
         description='Output MarkerArray topic for the pose graph viewer.',
     ),
     DeclareLaunchArgument(
+        'robot_centric_viewer',
+        default_value='true',
+        choices=['true', 'false'],
+        description='Aggregate CSLAM visualization topics into one MRG-style robot-centric view.',
+    ),
+    DeclareLaunchArgument(
         'pose_graph_viewer_node_scale',
         default_value='0.30',
         description='Sphere diameter for pose-graph nodes in meters.',
@@ -159,6 +165,11 @@ ARGUMENTS = [
         description='Publish period in seconds for the fused global CSLAM map.',
     ),
     DeclareLaunchArgument(
+        'merged_viewer_delay_sec',
+        default_value='6.0',
+        description='Delay before starting the cached merged CSLAM viewers.',
+    ),
+    DeclareLaunchArgument(
         'start_evaluation_recorders',
         default_value='true',
         choices=['true', 'false'],
@@ -176,7 +187,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'evaluation_run_type',
-        default_value='multi_data_run',
+        default_value='swarm_multi',
         description='Results subfolder for this launch.',
     ),
 ]
@@ -188,7 +199,7 @@ def _create_swarm_single_slam_instance(
     robot_id: str,
     start_graph_viewer: Union[LaunchConfiguration, str],
     start_cloud_viewer: Union[LaunchConfiguration, str],
-) -> IncludeLaunchDescription:
+) -> GroupAction:
     """
     Create one robot instance by including swarm_single_slam.launch.py.
     Args:
@@ -200,41 +211,49 @@ def _create_swarm_single_slam_instance(
     Return:
         IncludeLaunchDescription action for one robot instance.
     """
-    return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(swarm_single_slam_launch),
-        launch_arguments={
-            'robot_name': robot_name,
-            'robot_id': robot_id,
-            'max_nb_robots': MAX_NB_ROBOTS,
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'config_path': LaunchConfiguration('config_path'),
-            'config_file': LaunchConfiguration('config_file'),
-            'lidar_odometry_config': LaunchConfiguration('lidar_odometry_config'),
-            'launch_prefix_cslam': LaunchConfiguration('launch_prefix_cslam'),
-            'enable_simulated_rendezvous': LaunchConfiguration('enable_simulated_rendezvous'),
-            'rendezvous_schedule_file': LaunchConfiguration('rendezvous_schedule_file'),
-            'log_level': LaunchConfiguration('log_level'),
-            'start_graph_viewer': start_graph_viewer,
-            'start_cloud_viewer': start_cloud_viewer,
-            'start_merged_viewer': LaunchConfiguration('start_merged_viewer'),
-            'swarm_slam_delay_sec': LaunchConfiguration('swarm_slam_delay_sec'),
-            'pose_graph_viewer_delay_sec': LaunchConfiguration('pose_graph_viewer_delay_sec'),
-            'keyframe_cloud_viewer_delay_sec': LaunchConfiguration('keyframe_cloud_viewer_delay_sec'),
-            'pose_graph_viewer_input_topic': LaunchConfiguration('pose_graph_viewer_input_topic'),
-            'pose_graph_viewer_output_topic': LaunchConfiguration('pose_graph_viewer_output_topic'),
-            'pose_graph_viewer_node_scale': LaunchConfiguration('pose_graph_viewer_node_scale'),
-            'pose_graph_viewer_edge_width': LaunchConfiguration('pose_graph_viewer_edge_width'),
-            'keyframe_pose_graph_topic': LaunchConfiguration('keyframe_pose_graph_topic'),
-            'keyframe_cloud_topic': LaunchConfiguration('keyframe_cloud_topic'),
-            'keyframe_odom_topic': f'/{robot_name}/cslam/keyframe_odom',
-            'keyframe_cloud_output_topic': LaunchConfiguration('keyframe_cloud_output_topic'),
-            'keyframe_point_scale': LaunchConfiguration('keyframe_point_scale'),
-            'max_points_per_keyframe': LaunchConfiguration('max_points_per_keyframe'),
-            'keyframe_stride': LaunchConfiguration('keyframe_stride'),
-            'keyframe_cloud_voxel_size': LaunchConfiguration('keyframe_cloud_voxel_size'),
-            'keyframe_cloud_publish_period_sec': LaunchConfiguration('keyframe_cloud_publish_period_sec'),
-            'start_evaluation_recorders': 'false',
-        }.items(),
+    return GroupAction(
+        scoped=True,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(swarm_single_slam_launch),
+                launch_arguments={
+                    'robot_name': robot_name,
+                    'robot_id': robot_id,
+                    'max_nb_robots': MAX_NB_ROBOTS,
+                    'use_sim_time': LaunchConfiguration('use_sim_time'),
+                    'config_path': LaunchConfiguration('config_path'),
+                    'config_file': LaunchConfiguration('config_file'),
+                    'lidar_odometry_config': LaunchConfiguration('lidar_odometry_config'),
+                    'launch_prefix_cslam': LaunchConfiguration('launch_prefix_cslam'),
+                    'enable_simulated_rendezvous': LaunchConfiguration('enable_simulated_rendezvous'),
+                    'rendezvous_schedule_file': LaunchConfiguration('rendezvous_schedule_file'),
+                    'log_level': LaunchConfiguration('log_level'),
+                    'start_graph_viewer': start_graph_viewer,
+                    'start_cloud_viewer': start_cloud_viewer,
+                    'start_merged_viewer': LaunchConfiguration('start_merged_viewer'),
+                    'swarm_slam_delay_sec': LaunchConfiguration('swarm_slam_delay_sec'),
+                    'pose_graph_viewer_delay_sec': LaunchConfiguration('pose_graph_viewer_delay_sec'),
+                    'keyframe_cloud_viewer_delay_sec': LaunchConfiguration('keyframe_cloud_viewer_delay_sec'),
+                    'merged_viewer_delay_sec': LaunchConfiguration('merged_viewer_delay_sec'),
+                    'pose_graph_viewer_input_topic': LaunchConfiguration('pose_graph_viewer_input_topic'),
+                    'pose_graph_viewer_output_topic': LaunchConfiguration('pose_graph_viewer_output_topic'),
+                    'robot_centric_viewer': LaunchConfiguration('robot_centric_viewer'),
+                    'pose_graph_viewer_node_scale': LaunchConfiguration('pose_graph_viewer_node_scale'),
+                    'pose_graph_viewer_edge_width': LaunchConfiguration('pose_graph_viewer_edge_width'),
+                    'keyframe_pose_graph_topic': LaunchConfiguration('keyframe_pose_graph_topic'),
+                    'keyframe_cloud_topic': LaunchConfiguration('keyframe_cloud_topic'),
+                    'keyframe_odom_topic': f'/{robot_name}/cslam/keyframe_odom',
+                    'keyframe_cloud_output_topic': LaunchConfiguration('keyframe_cloud_output_topic'),
+                    'keyframe_point_scale': LaunchConfiguration('keyframe_point_scale'),
+                    'max_points_per_keyframe': LaunchConfiguration('max_points_per_keyframe'),
+                    'keyframe_stride': LaunchConfiguration('keyframe_stride'),
+                    'keyframe_cloud_voxel_size': LaunchConfiguration('keyframe_cloud_voxel_size'),
+                    'keyframe_cloud_publish_period_sec': LaunchConfiguration('keyframe_cloud_publish_period_sec'),
+                    'initialize_anchor_from_first_pose': 'true',
+                    'start_evaluation_recorders': 'false',
+                }.items(),
+            )
+        ],
     )
 
 
@@ -276,6 +295,7 @@ def generate_launch_description() -> LaunchDescription:
                 'run_id': LaunchConfiguration('results_run_id'),
                 'graph_mode': 'swarm',
                 'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
+                'swarm_record_merged_graphs': 'false',
             }.items(),
             condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
         )

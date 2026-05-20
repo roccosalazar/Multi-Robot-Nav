@@ -254,6 +254,7 @@ def generate_launch_description() -> LaunchDescription:
                 'run_id': LaunchConfiguration('results_run_id'),
                 'graph_mode': 'swarm',
                 'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
+                'swarm_record_merged_graphs': 'false',
             }.items(),
             condition=IfCondition(LaunchConfiguration('start_evaluation_recorders')),
         )

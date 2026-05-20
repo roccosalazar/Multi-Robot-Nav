@@ -65,9 +65,26 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'swarm_record_merged_graphs',
-        default_value='true',
+        default_value='false',
         choices=['true', 'false'],
         description='Also record /<robot>/cslam/viz/merged_pose_graph topics.',
+    ),
+    DeclareLaunchArgument(
+        'swarm_robot_centric_global_graphs',
+        default_value='true',
+        choices=['true', 'false'],
+        description=(
+            'Aggregate /cslam/viz/pose_graph snapshots per robot component '
+            'before writing CSVs.'
+        ),
+    ),
+    DeclareLaunchArgument(
+        'swarm_keyframe_odom_topic_template',
+        default_value='/{robot_name}/cslam/keyframe_odom',
+        description=(
+            'Template for Swarm KeyframeOdom topics used to add per-keyframe '
+            'ROS timestamps to node CSVs.'
+        ),
     ),
     DeclareLaunchArgument(
         'mrg_poll_period_sec',
@@ -125,6 +142,12 @@ def generate_launch_description() -> LaunchDescription:
                 ),
                 'swarm_record_merged_graphs': LaunchConfiguration(
                     'swarm_record_merged_graphs'
+                ),
+                'swarm_robot_centric_global_graphs': LaunchConfiguration(
+                    'swarm_robot_centric_global_graphs'
+                ),
+                'swarm_keyframe_odom_topic_template': LaunchConfiguration(
+                    'swarm_keyframe_odom_topic_template'
                 ),
                 'mrg_poll_period_sec': LaunchConfiguration(
                     'mrg_poll_period_sec'
