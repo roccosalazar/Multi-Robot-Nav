@@ -25,6 +25,11 @@ ARGUMENTS = [
 		choices=['true', 'false'],
 		description='Forward and filter Gazebo dynamic pose to PoseStamped in /<robot_name>/ground_truth/pose.',
 	),
+	DeclareLaunchArgument(
+		'ground_truth_world',
+		default_value='auto',
+		description='Gazebo world name for ground-truth pose bridge, or auto to detect.',
+	),
 ]
 
 
@@ -64,7 +69,7 @@ def generate_launch_description() -> LaunchDescription:
 		PythonLaunchDescriptionSource(ground_truth_pose_launch),
 		launch_arguments={
 			'robot_name': LaunchConfiguration('robot_name'),
-			'world': LaunchConfiguration('world'),
+			'world': LaunchConfiguration('ground_truth_world'),
 			'use_sim_time': LaunchConfiguration('use_sim_time'),
 		}.items(),
 		condition=IfCondition(LaunchConfiguration('ground_truth_pose')),
