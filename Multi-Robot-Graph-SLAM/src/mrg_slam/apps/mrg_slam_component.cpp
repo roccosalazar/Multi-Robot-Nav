@@ -5,6 +5,7 @@
 #include <chrono>
 #include <ctime>
 #include <functional>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -64,6 +65,8 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/serialization.hpp>
+#include <rclcpp/serialized_message.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
@@ -94,6 +97,7 @@ public:
         one_shot_initalization_timer_->cancel();
 
         initialize_params();
+        initialize_communication_logging();
 
         graph_slam_.reset( new GraphSLAM( get_parameter( "g2o_solver_type" ).as_string() ) );
         graph_slam_->set_save_graph( get_parameter( "save_graph" ).as_bool() );
@@ -280,6 +284,7 @@ private:
         declare_parameter<std::string>( "loop_closure_edge_robust_kernel", "Huber" );
         declare_parameter<double>( "loop_closure_edge_robust_kernel_size", 1.0 );
         declare_parameter<std::string>( "result_dir", "" );
+        declare_parameter<std::string>( "communication_output_dir", "" );
 
         // KeyframeUpdater parameters (not directly used by this class)
         declare_parameter<double>( "keyframe_delta_trans", 2.0 );
@@ -625,6 +630,8 @@ private:
             RCLCPP_INFO_STREAM( get_logger(), "Request graph service call to rover " << other_robot_name << " successful" );
         }
         auto result = result_future.get();
+        record_graph_exchange_metrics( other_robot_name, request_graph_service_clients_[other_robot_name]->get_service_name(), *req,
+                        *result );
         // collect some statistics
         int graph_bytes = 0;
         for( const auto &keyframe : result->graph.keyframes ) {
@@ -1294,6 +1301,7 @@ private:
                 RCLCPP_INFO_STREAM( get_logger(), "Request graph service call to rover " << robot_name << " successful" );
             }
             auto result = result_future.get();
+            record_graph_exchange_metrics( robot_name, request_graph_service_clients_[robot_name]->get_service_name(), *pub_req, *result );
 
             // Fill the graph queue with the received graph
             graph_database_->add_graph_ros( std::move( result->graph ) );
@@ -1419,6 +1427,11 @@ private:
     std::vector<int>     received_graph_bytes_;
     std::vector<int>     sent_graph_bytes_;
 
+    std::mutex                     communication_metrics_mutex_;
+    std::string                    communication_output_dir_;
+    std::string                    communication_services_path_;
+    std::unique_ptr<std::ofstream> communication_services_ofs_;
+
     // all the below members must be accessed after locking main_thread_mutex
     std::mutex main_thread_mutex_;
 
@@ -1428,6 +1441,92 @@ private:
     std::shared_ptr<GraphDatabase>   graph_database_;
     std::unique_ptr<LoopDetector>    loop_detector_;
     std::unique_ptr<KeyframeUpdater> keyframe_updater_;
+
+    void initialize_communication_logging()
+    {
+        communication_output_dir_ = get_parameter( "communication_output_dir" ).as_string();
+        if( communication_output_dir_.empty() ) {
+            return;
+        }
+
+        boost::filesystem::path output_dir( communication_output_dir_ );
+        if( !boost::filesystem::exists( output_dir ) ) {
+            boost::filesystem::create_directories( output_dir );
+        }
+
+        std::string safe_name = own_name_;
+        boost::algorithm::replace_all( safe_name, "/", "_" );
+        boost::algorithm::replace_all( safe_name, ",", "_" );
+        if( safe_name.empty() ) {
+            safe_name = "unnamed";
+        }
+
+        communication_services_path_ = ( output_dir / ( "communication_services_" + safe_name + ".csv" ) ).string();
+
+        bool write_header = true;
+        if( boost::filesystem::exists( communication_services_path_ ) ) {
+            write_header = ( boost::filesystem::file_size( communication_services_path_ ) == 0 );
+        }
+
+        communication_services_ofs_ = std::make_unique<std::ofstream>( communication_services_path_, std::ios::out | std::ios::app );
+        if( !communication_services_ofs_ || !communication_services_ofs_->is_open() ) {
+            communication_services_ofs_.reset();
+            RCLCPP_WARN_STREAM( get_logger(), "Unable to open communication services log at " << communication_services_path_ );
+            return;
+        }
+
+        if( write_header ) {
+            ( *communication_services_ofs_ )
+                << "timestamp_sec,source_robot,peer_robot,service_name,request_bytes,response_bytes,total_bytes,response_keyframes,"
+                   "response_edges,response_cloud_bytes,request_processed_keyframes,request_processed_edges\n";
+        }
+    }
+
+    template <typename MessageT>
+    size_t serialized_bytes( const MessageT &message ) const
+    {
+        rclcpp::SerializedMessage serialized;
+        rclcpp::Serialization<MessageT> serializer;
+        serializer.serialize_message( &message, &serialized );
+        return serialized.size();
+    }
+
+    void record_graph_exchange_metrics( const std::string &peer_robot, const std::string &service_name,
+                                        const mrg_slam_msgs::srv::PublishGraph::Request &request,
+                                        const mrg_slam_msgs::srv::PublishGraph::Response &response )
+    {
+        if( !communication_services_ofs_ ) {
+            return;
+        }
+
+        size_t request_bytes = 0;
+        size_t response_bytes = 0;
+        try {
+            request_bytes = serialized_bytes( request );
+            response_bytes = serialized_bytes( response );
+        } catch( const std::exception &exc ) {
+            RCLCPP_WARN_STREAM( get_logger(), "Failed to serialize publish_graph exchange for metrics: " << exc.what() );
+            return;
+        }
+
+        size_t response_cloud_bytes = 0;
+        for( const auto &keyframe : response.graph.keyframes ) {
+            response_cloud_bytes += keyframe.cloud.data.size();
+        }
+
+        const size_t total_bytes = request_bytes + response_bytes;
+        const size_t response_keyframes = response.graph.keyframes.size();
+        const size_t response_edges = response.graph.edges.size();
+        const size_t request_processed_keyframes = request.processed_keyframe_uuid_strs.size();
+        const size_t request_processed_edges = request.processed_edge_uuid_strs.size();
+
+        std::lock_guard<std::mutex> lock( communication_metrics_mutex_ );
+        ( *communication_services_ofs_ ) << std::fixed << std::setprecision( 9 ) << now().seconds() << ',' << own_name_ << ','
+                                         << peer_robot << ',' << service_name << ',' << request_bytes << ',' << response_bytes << ','
+                                         << total_bytes << ',' << response_keyframes << ',' << response_edges << ','
+                                         << response_cloud_bytes << ',' << request_processed_keyframes << ',' << request_processed_edges
+                                         << '\n';
+    }
 };
 
 }  // namespace mrg_slam

@@ -3240,6 +3240,16 @@ def write_report(
             "network bandwidth measurements."
         )
         lines.append("")
+        topic_total_mb = communication_summary.get(
+            "topic_total_MB",
+            communication_summary.get("total_MB", 0.0),
+        )
+        service_total_mb = communication_summary.get("service_total_MB", 0.0)
+        combined_total_mb = communication_summary.get(
+            "combined_total_MB",
+            float(topic_total_mb) + float(service_total_mb),
+        )
+        service_events = communication_summary.get("service_event_count", 0)
         overview = pd.DataFrame(
             [
                 {
@@ -3248,7 +3258,10 @@ def write_report(
                     "total_messages": communication_summary.get(
                         "total_messages", 0
                     ),
-                    "total_MB": communication_summary.get("total_MB", 0.0),
+                    "topic_total_MB": topic_total_mb,
+                    "service_total_MB": service_total_mb,
+                    "combined_total_MB": combined_total_mb,
+                    "service_events": service_events,
                     "average_bandwidth_MBps": communication_summary.get(
                         "average_bandwidth_MBps", 0.0
                     ),

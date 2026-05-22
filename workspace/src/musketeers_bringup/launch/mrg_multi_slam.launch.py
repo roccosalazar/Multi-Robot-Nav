@@ -1,4 +1,5 @@
 from ament_index_python.packages import get_package_share_directory
+from pathlib import Path
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
@@ -6,6 +7,16 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from datetime import datetime, timezone
+
+
+def _default_results_root() -> str:
+    current = Path(__file__).resolve()
+    for parent in [current.parent, *current.parents]:
+        if parent.name == 'Multi-Robot-Nav':
+            return str(parent / 'results')
+        if (parent / 'results').is_dir() and (parent / 'workspace').exists():
+            return str(parent / 'results')
+    return str((Path.cwd() / 'results').resolve())
 
 
 ARGUMENTS = [
@@ -22,14 +33,31 @@ ARGUMENTS = [
     DeclareLaunchArgument('start_evaluation_recorders', default_value='true', choices=['true', 'false'], description='Start aggregate SLAM evaluation CSV recorders.'),
     DeclareLaunchArgument('start_aggregate_recorders', default_value='true', choices=['true', 'false'], description='Internal toggle for the shared multi-robot evaluation recorders.'),
     DeclareLaunchArgument('record_communication', default_value='true', choices=['true', 'false'], description='Record estimated logical inter-robot SLAM communication metrics.'),
-    DeclareLaunchArgument('results_root', default_value='', description='Results root. Empty means <Multi-Robot-Nav>/results.'),
+    DeclareLaunchArgument('results_root', default_value=_default_results_root(), description='Results root.'),
     DeclareLaunchArgument('results_run_id', default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'), description='Shared results run id.'),
     DeclareLaunchArgument('evaluation_run_type', default_value='mrg_multi', description='Results subfolder for this launch.'),
     DeclareLaunchArgument('mrg_graph_record_period_sec', default_value='1.0', description='Polling period for MRG graph snapshots.'),
+    DeclareLaunchArgument(
+        'communication_output_dir',
+        default_value=PathJoinSubstitution([
+            LaunchConfiguration('results_root'),
+            LaunchConfiguration('evaluation_run_type'),
+            LaunchConfiguration('results_run_id'),
+            'communication',
+        ]),
+        description='Directory for MRG service communication metrics.',
+    ),
 ]
 
 
-def _slam_instance(slam_bringup_launch: PathJoinSubstitution, robot_name: str, x: str, y: str, z: str) -> IncludeLaunchDescription:
+def _slam_instance(
+    slam_bringup_launch: PathJoinSubstitution,
+    robot_name: str,
+    x: str,
+    y: str,
+    z: str,
+    communication_output_dir: LaunchConfiguration,
+) -> IncludeLaunchDescription:
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_bringup_launch),
         launch_arguments={
@@ -47,6 +75,7 @@ def _slam_instance(slam_bringup_launch: PathJoinSubstitution, robot_name: str, x
             'base_frame': LaunchConfiguration('base_frame'),
             'publish_rate': LaunchConfiguration('publish_rate'),
             'lookup_timeout_sec': LaunchConfiguration('lookup_timeout_sec'),
+            'communication_output_dir': communication_output_dir,
             'start_evaluation_recorders': 'false',
         }.items(),
     )
@@ -58,9 +87,10 @@ def generate_launch_description() -> LaunchDescription:
     slam_bringup_launch = PathJoinSubstitution([pkg_musketeers_bringup, 'launch', 'mrg_single_slam.launch.py'])
     recorders_launch = PathJoinSubstitution([pkg_slam_evaluation, 'launch', 'slam_recorders.launch.py'])
 
-    r0_slam = _slam_instance(slam_bringup_launch, 'r0', '-3.0', '0.0', '0.0')
-    r1_slam = _slam_instance(slam_bringup_launch, 'r1', '0.0', '0.0', '0.0')
-    r2_slam = _slam_instance(slam_bringup_launch, 'r2', '3.0', '0.0', '0.0')
+    communication_output_dir = LaunchConfiguration('communication_output_dir')
+    r0_slam = _slam_instance(slam_bringup_launch, 'r0', '-3.0', '0.0', '0.0', communication_output_dir)
+    r1_slam = _slam_instance(slam_bringup_launch, 'r1', '0.0', '0.0', '0.0', communication_output_dir)
+    r2_slam = _slam_instance(slam_bringup_launch, 'r2', '3.0', '0.0', '0.0', communication_output_dir)
     recorders = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(recorders_launch),
         launch_arguments={

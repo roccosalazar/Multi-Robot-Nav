@@ -46,6 +46,7 @@ class SlamCommunicationRecorder(Node):
     TOPICS_FILE = 'communication_topics.csv'
     TIMESERIES_FILE = 'communication_timeseries.csv'
     EVENTS_FILE = 'communication_events.csv'
+    SERVICES_FILE_GLOB = 'communication_services*.csv'
 
     TOPICS_HEADER = [
         'topic',
@@ -282,6 +283,14 @@ class SlamCommunicationRecorder(Node):
                     r'^/mrg_slam/slam_pose_broadcast$',
                 ]
             )
+            for robot_name in self.robot_names:
+                escaped = re.escape(robot_name.strip('/'))
+                regexes.extend(
+                    [
+                        f'^/{escaped}/mrg_slam/odom_broadcast$',
+                        f'^/{escaped}/mrg_slam/slam_pose_broadcast$',
+                    ]
+                )
         return regexes
 
     def _default_exclude_regexes(self) -> list[str]:
@@ -318,7 +327,7 @@ class SlamCommunicationRecorder(Node):
                 "MRG graph exchange uses PublishGraph services carrying "
                 "keyframes, point clouds and edges. Passive topic recording "
                 "does not measure those service request/response payloads, so "
-                "MRG communication can be undercounted."
+                "topic-based totals are a lower bound on MRG communication."
             )
 
     def _discover_topics_and_services(self) -> None:
@@ -491,11 +500,21 @@ class SlamCommunicationRecorder(Node):
         )
         average_bps = float(total_bytes) / duration if duration > 0.0 else 0.0
 
+        service_metrics, service_files = self._load_service_metrics()
+        service_total_bytes = service_metrics['service_total_bytes']
+        combined_total_bytes = total_bytes + service_total_bytes
+
         warnings = sorted(self._warnings)
         if total_messages == 0:
             warnings.append(
                 "No matching inter-robot SLAM topic messages have been "
                 "observed yet."
+            )
+        if self.slam_type in ('auto', 'mrg') and not service_files:
+            warnings.append(
+                "No MRG publish_graph service payload metrics were found. "
+                "Ensure mrg_slam sets communication_output_dir to this run's "
+                "communication folder."
             )
 
         summary = {
@@ -506,6 +525,18 @@ class SlamCommunicationRecorder(Node):
             'total_messages': total_messages,
             'total_bytes': total_bytes,
             'total_MB': self._bytes_to_mb(total_bytes),
+            'topic_total_bytes': total_bytes,
+            'topic_total_MB': self._bytes_to_mb(total_bytes),
+            'service_total_bytes': service_total_bytes,
+            'service_total_MB': self._bytes_to_mb(service_total_bytes),
+            'combined_total_bytes': combined_total_bytes,
+            'combined_total_MB': self._bytes_to_mb(combined_total_bytes),
+            'service_request_bytes': service_metrics['service_request_bytes'],
+            'service_response_bytes': service_metrics['service_response_bytes'],
+            'service_event_count': service_metrics['service_event_count'],
+            'service_keyframes': service_metrics['service_keyframes'],
+            'service_edges': service_metrics['service_edges'],
+            'service_cloud_bytes': service_metrics['service_cloud_bytes'],
             'average_bandwidth_Bps': average_bps,
             'average_bandwidth_MBps': self._bytes_to_mb(average_bps),
             'peak_bandwidth_Bps': self._peak_bandwidth_bps,
@@ -566,6 +597,58 @@ class SlamCommunicationRecorder(Node):
                         f'{stats.peak_bandwidth_bps:.9f}',
                     ]
                 )
+
+    def _load_service_metrics(self) -> tuple[dict[str, int], list[Path]]:
+        service_files = sorted(self.output_dir.glob(self.SERVICES_FILE_GLOB))
+        totals = {
+            'service_event_count': 0,
+            'service_request_bytes': 0,
+            'service_response_bytes': 0,
+            'service_total_bytes': 0,
+            'service_keyframes': 0,
+            'service_edges': 0,
+            'service_cloud_bytes': 0,
+        }
+        if not service_files:
+            return totals, []
+
+        def _safe_int(value: object) -> int:
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                return 0
+
+        for path in service_files:
+            try:
+                with path.open('r', encoding='utf-8') as handle:
+                    reader = csv.DictReader(handle)
+                    for row in reader:
+                        request_bytes = _safe_int(row.get('request_bytes'))
+                        response_bytes = _safe_int(row.get('response_bytes'))
+                        total_bytes = _safe_int(row.get('total_bytes'))
+                        if total_bytes == 0:
+                            total_bytes = request_bytes + response_bytes
+
+                        totals['service_event_count'] += 1
+                        totals['service_request_bytes'] += request_bytes
+                        totals['service_response_bytes'] += response_bytes
+                        totals['service_total_bytes'] += total_bytes
+                        totals['service_keyframes'] += _safe_int(
+                            row.get('response_keyframes')
+                        )
+                        totals['service_edges'] += _safe_int(
+                            row.get('response_edges')
+                        )
+                        totals['service_cloud_bytes'] += _safe_int(
+                            row.get('response_cloud_bytes')
+                        )
+            except Exception as exc:
+                self._record_warning(
+                    f"Failed to read communication service metrics from "
+                    f"{path}: {exc}"
+                )
+
+        return totals, service_files
 
     def _record_warning(self, message: str) -> None:
         if message in self._warnings:

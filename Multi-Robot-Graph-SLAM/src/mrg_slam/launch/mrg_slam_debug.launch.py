@@ -77,6 +77,7 @@ PARAM_MAPPING = {
     'init_odom_topic': str,
     'init_pose_topic': str,
     'result_dir': str,
+    'communication_output_dir': str,
     'registration_method': str,
 }
 

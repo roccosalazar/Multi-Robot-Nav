@@ -242,5 +242,7 @@ mrg_slam_component:
     save_graph: false
     # if result_dir is given, all kinds of stats will be saved in this directory
     result_dir: ""
+    # directory for recording communication service payload metrics
+    communication_output_dir: ""
     # remappings are handled in the python respective launch file
 
