@@ -2087,6 +2087,39 @@ def write_point_errors(
         df.to_csv(point_dir / f"{source}_r{robot_id}_final_point_errors.csv", index=False)
 
 
+def estimate_position_alignment(
+    source_positions: np.ndarray,
+    target_positions: np.ndarray,
+) -> Alignment:
+    mask = np.isfinite(source_positions).all(axis=1) & np.isfinite(target_positions).all(axis=1)
+    source_positions = source_positions[mask]
+    target_positions = target_positions[mask]
+    if len(source_positions) == 0:
+        return Alignment(Rotation.identity(), np.zeros(3))
+    if len(source_positions) < 3:
+        return Alignment(Rotation.identity(), target_positions[0] - source_positions[0])
+
+    source_center = source_positions.mean(axis=0)
+    target_center = target_positions.mean(axis=0)
+    source_zero = source_positions - source_center
+    target_zero = target_positions - target_center
+    covariance = source_zero.T @ target_zero / len(source_positions)
+    u_matrix, _, vt_matrix = np.linalg.svd(covariance)
+    rotation_matrix = vt_matrix.T @ u_matrix.T
+    if np.linalg.det(rotation_matrix) < 0:
+        vt_matrix[-1, :] *= -1.0
+        rotation_matrix = vt_matrix.T @ u_matrix.T
+    rotation = Rotation.from_matrix(rotation_matrix)
+    translation = target_center - rotation.apply(source_center)
+    return Alignment(rotation, translation)
+
+
+def invert_alignment(alignment: Alignment) -> Alignment:
+    inverse_rotation = alignment.rotation.inv()
+    inverse_translation = -inverse_rotation.apply(alignment.translation)
+    return Alignment(inverse_rotation, inverse_translation)
+
+
 def dataframe_to_markdown(df: pd.DataFrame, floatfmt: str = ".4f") -> str:
     if df.empty:
         return ""
@@ -2223,6 +2256,12 @@ These plots compare the final SLAM trajectory with ground truth in the XY plane.
 - Start/end markers show trajectory endpoints.
 - Green markers on the SLAM trajectory indicate keyframes near intra-robot loop-closure events.
 - Red markers indicate keyframes near inter-robot loop-closure events.
+
+Files named `trajectory_<source>_global.png` show the final multi-robot graph
+published by one robot-centric source. Solid lines are graph trajectories in the
+source frame. Dashed lines are ground truth transformed into that same source
+frame using the source robot trajectory as the reference alignment. Circle and
+square markers show graph start and end points.
 """,
         "final_ate": """# Final ATE Plots
 
@@ -2380,6 +2419,9 @@ These plots show per-keyframe ATE in the final graph.
         key: group.sort_values("snapshot_seq").reset_index(drop=True)
         for key, group in metrics.groupby(["source", "robot_id"])
     }
+    point_errors_by_source: dict[str, dict[int, pd.DataFrame]] = {}
+    for (source, robot_id), df in point_errors.items():
+        point_errors_by_source.setdefault(source, {})[robot_id] = df
 
     for (source, robot_id), group in metrics.groupby(["source", "robot_id"]):
         group = group.sort_values("snapshot_seq").reset_index(drop=True)
@@ -2603,6 +2645,80 @@ These plots show per-keyframe ATE in the final graph.
             subdirs["final_ate"] / f"final_ate_by_keyframe_{source}_r{robot_id}.png",
             dpi=160,
         )
+        plt.close(fig)
+
+    def point_positions(df: pd.DataFrame, prefix: str) -> np.ndarray:
+        return df[[f"{prefix}_x", f"{prefix}_y", f"{prefix}_z"]].to_numpy(dtype=float)
+
+    for source, robot_dfs in sorted(point_errors_by_source.items()):
+        if not robot_dfs:
+            continue
+        source_robot_id = robot_id_from_text(source)
+        if source_robot_id not in robot_dfs:
+            source_robot_id = sorted(robot_dfs)[0]
+        reference_df = robot_dfs[source_robot_id]
+        graph_to_gt = estimate_position_alignment(
+            point_positions(reference_df, "graph"),
+            point_positions(reference_df, "gt"),
+        )
+        gt_to_graph = invert_alignment(graph_to_gt)
+
+        fig, axis = plt.subplots(figsize=(8.2, 8.2))
+        color_cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+        for color_idx, robot_id in enumerate(sorted(robot_dfs)):
+            df = robot_dfs[robot_id]
+            if df.empty:
+                continue
+            color = color_cycle[color_idx % len(color_cycle)] if color_cycle else None
+            graph_positions = point_positions(df, "graph")
+            gt_positions = gt_to_graph.apply(
+                point_positions(df, "gt"),
+                Rotation.identity(len(df)),
+            )[0]
+            axis.plot(
+                graph_positions[:, 0],
+                graph_positions[:, 1],
+                linewidth=1.8,
+                color=color,
+                label=f"r{robot_id} graph",
+            )
+            axis.plot(
+                gt_positions[:, 0],
+                gt_positions[:, 1],
+                linewidth=1.2,
+                linestyle="--",
+                color=color,
+                alpha=0.7,
+                label=f"r{robot_id} GT",
+            )
+            axis.scatter(
+                graph_positions[0, 0],
+                graph_positions[0, 1],
+                marker="o",
+                s=28,
+                color=color,
+                edgecolors="black",
+                linewidths=0.4,
+                zorder=4,
+            )
+            axis.scatter(
+                graph_positions[-1, 0],
+                graph_positions[-1, 1],
+                marker="s",
+                s=28,
+                color=color,
+                edgecolors="black",
+                linewidths=0.4,
+                zorder=4,
+            )
+        axis.set_aspect("equal", adjustable="box")
+        axis.set_xlabel(f"{source} frame x [m]")
+        axis.set_ylabel(f"{source} frame y [m]")
+        axis.grid(True, alpha=0.25)
+        axis.legend(loc="best", fontsize="small", ncol=2)
+        axis.set_title(f"{source}: final robot-centric global graph")
+        fig.tight_layout()
+        fig.savefig(subdirs["trajectory"] / f"trajectory_{source}_global.png", dpi=160)
         plt.close(fig)
 
     fig, axis = plt.subplots(figsize=(12, 6))
