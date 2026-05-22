@@ -25,7 +25,7 @@ ARGUMENTS = [
     DeclareLaunchArgument('publish_rate', default_value='20.0', description='Publish rate [Hz] for slam pose publisher.'),
     DeclareLaunchArgument('lookup_timeout_sec', default_value='0.1', description='TF lookup timeout [s].'),
     DeclareLaunchArgument('start_evaluation_recorders', default_value='true', choices=['true', 'false'], description='Start SLAM evaluation CSV recorders.'),
-    DeclareLaunchArgument('record_communication', default_value='false', choices=['true', 'false'], description='Record estimated logical inter-robot SLAM communication metrics.'),
+    DeclareLaunchArgument('record_communication', default_value='true', choices=['true', 'false'], description='Record estimated logical inter-robot SLAM communication metrics.'),
     DeclareLaunchArgument('results_root', default_value='', description='Results root. Empty means <Multi-Robot-Nav>/results.'),
     DeclareLaunchArgument('results_run_id', default_value=datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S'), description='Shared results run id.'),
     DeclareLaunchArgument('evaluation_run_type', default_value='mrg', description='Results subfolder for this launch.'),

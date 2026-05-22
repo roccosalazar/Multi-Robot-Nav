@@ -197,7 +197,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'record_communication',
-        default_value='false',
+        default_value='true',
         choices=['true', 'false'],
         description='Record estimated logical inter-robot SLAM communication metrics.',
     ),
