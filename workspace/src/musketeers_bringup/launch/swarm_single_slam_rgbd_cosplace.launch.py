@@ -158,6 +158,12 @@ ARGUMENTS = [
         description='Start SLAM evaluation CSV recorders.',
     ),
     DeclareLaunchArgument(
+        'record_communication',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Record estimated logical inter-robot SLAM communication metrics.',
+    ),
+    DeclareLaunchArgument(
         'results_root',
         default_value='',
         description='Results root. Empty means <Multi-Robot-Nav>/results.',
@@ -390,6 +396,7 @@ def generate_launch_description() -> LaunchDescription:
             'run_type': LaunchConfiguration('evaluation_run_type'),
             'run_id': LaunchConfiguration('results_run_id'),
             'graph_mode': 'swarm',
+            'record_communication': LaunchConfiguration('record_communication'),
             'swarm_pose_graph_topics': LaunchConfiguration('pose_graph_viewer_input_topic'),
             'swarm_record_merged_graphs': 'false',
         }.items(),

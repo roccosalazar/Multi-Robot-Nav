@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import argparse
 from functools import cached_property
-import csv
 from dataclasses import dataclass
+import json
 import math
 from pathlib import Path
 import re
@@ -2150,6 +2150,149 @@ def dataframe_to_markdown(df: pd.DataFrame, floatfmt: str = ".4f") -> str:
     return "\n".join([header, divider, *body])
 
 
+def load_communication_summary(run_dir: Path) -> dict[str, object] | None:
+    summary_path = run_dir / "communication" / "communication_summary.json"
+    if not summary_path.is_file():
+        return None
+    try:
+        return json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(
+            f"Warning: could not read communication summary {summary_path}: {exc}",
+            file=sys.stderr,
+        )
+        return None
+
+
+def load_communication_topics(run_dir: Path) -> pd.DataFrame:
+    topics_path = run_dir / "communication" / "communication_topics.csv"
+    if not topics_path.is_file():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(topics_path)
+    except Exception as exc:
+        print(
+            f"Warning: could not read communication topics {topics_path}: {exc}",
+            file=sys.stderr,
+        )
+        return pd.DataFrame()
+    for column in [
+        "message_count",
+        "total_bytes",
+        "total_MB",
+        "average_message_size_bytes",
+        "average_bandwidth_Bps",
+        "peak_bandwidth_Bps",
+    ]:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+    return df
+
+
+def load_communication_timeseries(run_dir: Path) -> pd.DataFrame:
+    timeseries_path = run_dir / "communication" / "communication_timeseries.csv"
+    if not timeseries_path.is_file():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(timeseries_path)
+    except Exception as exc:
+        print(
+            f"Warning: could not read communication timeseries {timeseries_path}: {exc}",
+            file=sys.stderr,
+        )
+        return pd.DataFrame()
+    for column in ["timestamp", "messages", "bytes", "bandwidth_Bps"]:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+    return df.dropna(subset=["timestamp", "bandwidth_Bps"])
+
+
+def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
+    communication = load_communication_timeseries(run_dir)
+    if communication.empty:
+        return
+
+    try:
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Unable to import Axes3D.*",
+                category=UserWarning,
+            )
+            import matplotlib
+
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+    except Exception:
+        print(
+            "matplotlib is not available; skipping communication plots.",
+            file=sys.stderr,
+        )
+        return
+
+    plot_dir = output_dir / "plots" / "communication"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    for path in plot_dir.glob("*.png"):
+        path.unlink()
+
+    readme = """# Communication Plots
+
+These plots show estimated logical inter-robot SLAM communication.
+
+- X axis: minutes from the first recorded communication sample.
+- Y axis: serialized ROS message payload bandwidth in MB/s.
+- The total line sums all measured communication topics per sample window.
+- This is not physical network bandwidth; DDS transport effects are outside this metric.
+"""
+    (plot_dir / "README.md").write_text(readme, encoding="utf-8")
+
+    communication = communication.sort_values("timestamp")
+    first_timestamp = float(communication["timestamp"].min())
+    total = (
+        communication.groupby("timestamp", as_index=False)["bandwidth_Bps"]
+        .sum()
+        .sort_values("timestamp")
+    )
+    topic_totals = (
+        communication.groupby("topic")["bytes"].sum().sort_values(ascending=False)
+    )
+    top_topics = list(topic_totals.head(5).index)
+
+    fig, axis = plt.subplots(figsize=(11, 5.5))
+    total_time_min = (
+        total["timestamp"].to_numpy(dtype=float) - first_timestamp
+    ) / 60.0
+    axis.plot(
+        total_time_min,
+        total["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+        label="Total",
+        linewidth=2.2,
+        color="black",
+    )
+    for topic in top_topics:
+        topic_group = communication[communication["topic"] == topic]
+        topic_time_min = (
+            topic_group["timestamp"].to_numpy(dtype=float) - first_timestamp
+        ) / 60.0
+        axis.plot(
+            topic_time_min,
+            topic_group["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+            linewidth=1.3,
+            alpha=0.8,
+            label=topic,
+        )
+    axis.set_xlabel("Time from first communication sample [min]")
+    axis.set_ylabel("Estimated logical bandwidth [MB/s]")
+    axis.grid(True, alpha=0.25)
+    axis.legend(loc="best", fontsize="small")
+    axis.set_title("Estimated logical inter-robot SLAM communication")
+    fig.tight_layout()
+    fig.savefig(plot_dir / "bandwidth_over_time.png", dpi=160)
+    plt.close(fig)
+
+
 def make_plots(metrics: pd.DataFrame, point_errors: dict[tuple[str, int], pd.DataFrame], output_dir: Path) -> None:
     try:
         import warnings
@@ -2809,6 +2952,8 @@ def write_report(
     events: pd.DataFrame,
     corr: pd.DataFrame,
     loop_diagnostics: pd.DataFrame,
+    communication_summary: dict[str, object] | None,
+    communication_topics: pd.DataFrame,
 ) -> None:
     report_path = output_dir / "report.md"
     lines: list[str] = []
@@ -3086,6 +3231,67 @@ def write_report(
         ]
         lines.append(dataframe_to_markdown(corr_view[keep], floatfmt=".4f"))
     lines.append("")
+    if communication_summary is not None:
+        lines.append("## Communication Metrics")
+        lines.append("")
+        lines.append(
+            "These values are estimated logical inter-robot communication from "
+            "serialized ROS message payloads. They are not physical DDS or "
+            "network bandwidth measurements."
+        )
+        lines.append("")
+        overview = pd.DataFrame(
+            [
+                {
+                    "slam_type": communication_summary.get("slam_type", ""),
+                    "duration_sec": communication_summary.get("duration_sec", 0.0),
+                    "total_messages": communication_summary.get(
+                        "total_messages", 0
+                    ),
+                    "total_MB": communication_summary.get("total_MB", 0.0),
+                    "average_bandwidth_MBps": communication_summary.get(
+                        "average_bandwidth_MBps", 0.0
+                    ),
+                    "peak_bandwidth_MBps": communication_summary.get(
+                        "peak_bandwidth_MBps", 0.0
+                    ),
+                }
+            ]
+        )
+        lines.append(dataframe_to_markdown(overview, floatfmt=".6f"))
+        lines.append("")
+        if communication_topics.empty:
+            lines.append("No communication topic rows were recorded.")
+        else:
+            top_topics = communication_topics.sort_values(
+                "total_bytes",
+                ascending=False,
+            ).head(8)
+            display_columns = [
+                "topic",
+                "message_type",
+                "message_count",
+                "total_MB",
+                "average_bandwidth_Bps",
+                "peak_bandwidth_Bps",
+            ]
+            existing = [
+                column for column in display_columns if column in top_topics.columns
+            ]
+            lines.append("Biggest measured communication topics:")
+            lines.append("")
+            lines.append(dataframe_to_markdown(top_topics[existing], floatfmt=".4f"))
+        notes_and_warnings = [
+            *communication_summary.get("notes", []),
+            *communication_summary.get("warnings", []),
+        ]
+        if notes_and_warnings:
+            lines.append("")
+            lines.append("Recorder notes and warnings:")
+            lines.append("")
+            for item in notes_and_warnings:
+                lines.append(f"- {item}")
+        lines.append("")
     lines.append("## Outputs")
     lines.append("")
     lines.append(
@@ -3111,6 +3317,11 @@ def write_report(
         "`rendezvous/`, `graph_correction/`, `rpe/`, `trajectory/`, "
         "`final_ate/`). Each folder includes a `README.md` explaining the plots."
     )
+    if communication_summary is not None:
+        lines.append(
+            "- `communication/`: estimated logical inter-robot communication "
+            "summary, topic totals, and bandwidth time series."
+        )
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -3314,6 +3525,8 @@ def analyze(args: argparse.Namespace) -> Path:
     corr = correlations(metrics)
     events = loop_events(metrics, args.event_window)
     summary = final_summary(metrics)
+    communication_summary = load_communication_summary(run_dir)
+    communication_topics = load_communication_topics(run_dir)
 
     metrics.to_csv(output_dir / "ate_timeseries.csv", index=False)
     transforms.to_csv(output_dir / "alignment_transforms.csv", index=False)
@@ -3324,6 +3537,7 @@ def analyze(args: argparse.Namespace) -> Path:
     write_point_errors(point_errors, output_dir)
     if not args.no_plots:
         make_plots(metrics, point_errors, output_dir)
+        make_communication_plots(run_dir, output_dir)
     write_report(
         output_dir=output_dir,
         run_dir=run_dir,
@@ -3333,6 +3547,8 @@ def analyze(args: argparse.Namespace) -> Path:
         events=events,
         corr=corr,
         loop_diagnostics=loop_diagnostics,
+        communication_summary=communication_summary,
+        communication_topics=communication_topics,
     )
     return output_dir
 

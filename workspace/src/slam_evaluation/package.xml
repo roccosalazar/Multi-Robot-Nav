@@ -12,6 +12,7 @@
   <depend>geometry_msgs</depend>
   <depend>mrg_slam_msgs</depend>
   <depend>nav_msgs</depend>
+  <depend>rosidl_runtime_py</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>tf2_msgs</depend>

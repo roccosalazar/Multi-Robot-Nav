@@ -53,6 +53,14 @@ ARGUMENTS = [
         description='Start the pose-graph snapshot recorder.',
     ),
     DeclareLaunchArgument(
+        'record_communication',
+        default_value='false',
+        choices=['true', 'false'],
+        description=(
+            'Record estimated logical inter-robot SLAM communication metrics.'
+        ),
+    ),
+    DeclareLaunchArgument(
         'graph_mode',
         default_value='auto',
         choices=['auto', 'swarm', 'mrg'],
@@ -156,7 +164,29 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    communication_recorder = Node(
+        package='slam_evaluation',
+        executable='slam_communication_recorder',
+        name='slam_communication_recorder',
+        output='log',
+        condition=IfCondition(LaunchConfiguration('record_communication')),
+        parameters=[
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'slam_type': LaunchConfiguration('graph_mode'),
+                'robot_names': LaunchConfiguration('robot_names'),
+                'results_root': LaunchConfiguration('results_root'),
+                'run_type': LaunchConfiguration('run_type'),
+                'run_id': ParameterValue(
+                    LaunchConfiguration('run_id'),
+                    value_type=str,
+                ),
+            }
+        ],
+    )
+
     launch_description = LaunchDescription(ARGUMENTS)
     launch_description.add_action(ground_truth_recorder)
     launch_description.add_action(pose_graph_recorder)
+    launch_description.add_action(communication_recorder)
     return launch_description

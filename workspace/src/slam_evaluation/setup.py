@@ -37,6 +37,10 @@ setup(
                 'slam_evaluation.ground_truth_trajectory_recorder:main'
             ),
             'pose_graph_recorder = slam_evaluation.pose_graph_recorder:main',
+            (
+                'slam_communication_recorder = '
+                'slam_evaluation.slam_communication_recorder_node:main'
+            ),
         ],
     },
 )
