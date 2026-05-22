@@ -115,7 +115,7 @@ class SlamCommunicationRecorder(Node):
             self.output_dir / 'communication_recorder.log',
         )
 
-        self._subscriptions = {}
+        self._communication_subscriptions = {}
         self._topic_stats: dict[str, TopicStats] = {}
         self._topic_type_failures: set[str] = set()
         self._serialization_failures: set[str] = set()
@@ -338,7 +338,7 @@ class SlamCommunicationRecorder(Node):
             return
 
         for topic, message_types in topics_and_types:
-            if topic in self._subscriptions:
+            if topic in self._communication_subscriptions:
                 continue
             if not message_types:
                 continue
@@ -391,7 +391,7 @@ class SlamCommunicationRecorder(Node):
             )
             return
 
-        self._subscriptions[topic] = subscription
+        self._communication_subscriptions[topic] = subscription
         self._topic_stats.setdefault(topic, TopicStats(message_type_name))
         self.file_logger.info(
             f"Recording communication topic '{topic}' "
