@@ -1446,6 +1446,10 @@ private:
     {
         communication_output_dir_ = get_parameter( "communication_output_dir" ).as_string();
         if( communication_output_dir_.empty() ) {
+            RCLCPP_INFO_STREAM( get_logger(), "MRG communication service logging startup: robot_name="
+                                                  << own_name_ << " namespace=" << get_namespace()
+                                                  << " communication_output_dir=<empty> final_path=<disabled>"
+                                                  << " output_file_open=false" );
             return;
         }
 
@@ -1471,7 +1475,11 @@ private:
         communication_services_ofs_ = std::make_unique<std::ofstream>( communication_services_path_, std::ios::out | std::ios::app );
         if( !communication_services_ofs_ || !communication_services_ofs_->is_open() ) {
             communication_services_ofs_.reset();
-            RCLCPP_WARN_STREAM( get_logger(), "Unable to open communication services log at " << communication_services_path_ );
+            RCLCPP_WARN_STREAM( get_logger(), "MRG communication service logging startup: robot_name="
+                                                  << own_name_ << " namespace=" << get_namespace()
+                                                  << " communication_output_dir=" << communication_output_dir_
+                                                  << " final_path=" << communication_services_path_
+                                                  << " output_file_open=false" );
             return;
         }
 
@@ -1479,7 +1487,13 @@ private:
             ( *communication_services_ofs_ )
                 << "timestamp_sec,source_robot,peer_robot,service_name,request_bytes,response_bytes,total_bytes,response_keyframes,"
                    "response_edges,response_cloud_bytes,request_processed_keyframes,request_processed_edges\n";
+            communication_services_ofs_->flush();
         }
+        RCLCPP_INFO_STREAM( get_logger(), "MRG communication service logging startup: robot_name="
+                                              << own_name_ << " namespace=" << get_namespace()
+                                              << " communication_output_dir=" << communication_output_dir_
+                                              << " final_path=" << communication_services_path_
+                                              << " output_file_open=true" );
     }
 
     template <typename MessageT>
@@ -1526,6 +1540,12 @@ private:
                                          << total_bytes << ',' << response_keyframes << ',' << response_edges << ','
                                          << response_cloud_bytes << ',' << request_processed_keyframes << ',' << request_processed_edges
                                          << '\n';
+        communication_services_ofs_->flush();
+        RCLCPP_INFO_STREAM( get_logger(), "Logged PublishGraph service response: requesting_robot="
+                                              << request.robot_name << " source_robot=" << peer_robot << " local_robot=" << own_name_
+                                              << " request_bytes=" << request_bytes << " response_bytes=" << response_bytes
+                                              << " keyframes=" << response_keyframes << " edges=" << response_edges
+                                              << " cloud_bytes=" << response_cloud_bytes );
     }
 };
 

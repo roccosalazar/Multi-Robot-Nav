@@ -83,9 +83,12 @@ PARAM_MAPPING = {
 
 
 # Overwrite the parameters from the yaml file with the ones from the cli if the cli string is not empty
-def overwrite_yaml_params_from_cli(yaml_params, cli_params):
+def overwrite_yaml_params_from_cli(yaml_params, cli_params, allowed_new_keys=None):
+    allowed_new_keys = set() if allowed_new_keys is None else set(allowed_new_keys)
     for key, value in cli_params.items():
-        if key in yaml_params and value != '':
+        if key not in yaml_params and key not in allowed_new_keys:
+            continue
+        if value != '':
             # Since all parameters from cli in ROS2 are strings, we need to infer the correct data type
             yaml_params[key] = PARAM_MAPPING[key](value)
             # Overwrite the boolean values since they are not correctly parsed, non empty strings are always True
@@ -138,7 +141,11 @@ def launch_setup(context, *args, **kwargs):
     prefiltering_params = overwrite_yaml_params_from_cli(prefiltering_params, context.launch_configurations)
     scan_matching_odometry_params = overwrite_yaml_params_from_cli(scan_matching_odometry_params, context.launch_configurations)
     floor_detection_params = overwrite_yaml_params_from_cli(floor_detection_params, context.launch_configurations)
-    mrg_slam_params = overwrite_yaml_params_from_cli(mrg_slam_params, context.launch_configurations)
+    mrg_slam_params = overwrite_yaml_params_from_cli(
+        mrg_slam_params,
+        context.launch_configurations,
+        allowed_new_keys={'communication_output_dir'},
+    )
 
     model_namespace = shared_params['model_namespace']
 

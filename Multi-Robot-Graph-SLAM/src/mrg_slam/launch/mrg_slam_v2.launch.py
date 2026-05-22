@@ -99,6 +99,7 @@ def overwrite_yaml_params_from_cli(
     yaml_params: ParameterDict,
     cli_params: dict[str, str],
     excluded_keys: Optional[Iterable[str]] = None,
+    allowed_new_keys: Optional[Iterable[str]] = None,
 ) -> ParameterDict:
     """
     Override YAML parameters with non-empty CLI values.
@@ -107,16 +108,19 @@ def overwrite_yaml_params_from_cli(
         yaml_params: Parameters loaded from YAML.
         cli_params: Launch configuration key/value pairs.
         excluded_keys: Optional parameter names that must not be overridden.
+        allowed_new_keys: Optional CLI parameter names that may be added when
+            absent from the selected YAML config.
 
     Returns:
         Updated parameter dictionary.
     """
     excluded: set[str] = set(excluded_keys or [])
+    allowed_new: set[str] = set(allowed_new_keys or [])
 
     for key, raw_value in cli_params.items():
         if key in excluded:
             continue
-        if key not in yaml_params:
+        if key not in yaml_params and key not in allowed_new:
             continue
         if raw_value == "":
             continue
@@ -317,7 +321,11 @@ def launch_setup(context: LaunchContext, *args: Any, **kwargs: Any) -> List[Any]
     prefiltering_params = overwrite_yaml_params_from_cli(prefiltering_params, launch_configurations)
     scan_matching_odometry_params = overwrite_yaml_params_from_cli(scan_matching_odometry_params, launch_configurations)
     floor_detection_params = overwrite_yaml_params_from_cli(floor_detection_params, launch_configurations)
-    mrg_slam_params = overwrite_yaml_params_from_cli(mrg_slam_params, launch_configurations)
+    mrg_slam_params = overwrite_yaml_params_from_cli(
+        mrg_slam_params,
+        launch_configurations,
+        allowed_new_keys={"communication_output_dir"},
+    )
 
     model_namespace: str = shared_params["model_namespace"]
     tf_topics_in_model_namespace: bool = shared_params.get("tf_topics_in_model_namespace", False)
