@@ -12,6 +12,7 @@ from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from diagnostic_msgs.msg import KeyValue
+from cslam.simulated_rendezvous import SimulatedRendezvous
 
 class LidarHandler: 
     """Front-End data handler for lidar data
@@ -26,6 +27,12 @@ class LidarHandler:
         self.processed_sensor_pairs_count = 0
         self.keyframes_created_count = 0
         self.last_sync_abs_dt = None
+        self.rendezvous_gate = SimulatedRendezvous(
+            self.node,
+            self.params.get("evaluation.enable_simulated_rendezvous", False),
+            self.params.get("evaluation.rendezvous_schedule_file", ""),
+            self.params["robot_id"],
+        )
 
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -162,6 +169,8 @@ class LidarHandler:
     def send_local_descriptors_request(self, request):
         """Callback for local descriptors request
         """
+        if not self.rendezvous_gate.is_alive():
+            return
         out_msg = LocalPointCloudDescriptors()
         out_msg.data = icp_utils.open3d_to_ros(self.local_descriptors_map[request.keyframe_id])
         out_msg.keyframe_id = request.keyframe_id
@@ -177,6 +186,8 @@ class LidarHandler:
     def receive_local_descriptors(self, msg):
         """Callback for local descriptors from other robots
         """
+        if not self.rendezvous_gate.is_alive():
+            return
         frame_ids = []
         for i in range(len(msg.matches_robot_id)):
             if msg.matches_robot_id[i] == self.params["robot_id"]:
@@ -345,6 +356,8 @@ if __name__ == '__main__':
                         ('evaluation.enable_gps_recording', False), 
                         ('evaluation.gps_topic', ""),            
                         ('evaluation.gps_topic', ""),        
+                        ('evaluation.enable_simulated_rendezvous', False),
+                        ('evaluation.rendezvous_schedule_file', ''),
                         ('visualization.enable', False),
                         ])
     params = {}
@@ -374,6 +387,10 @@ if __name__ == '__main__':
             'evaluation.enable_gps_recording').value
     params["evaluation.gps_topic"] = node.get_parameter(
             'evaluation.gps_topic').value
+    params["evaluation.enable_simulated_rendezvous"] = node.get_parameter(
+            'evaluation.enable_simulated_rendezvous').value
+    params["evaluation.rendezvous_schedule_file"] = node.get_parameter(
+            'evaluation.rendezvous_schedule_file').value
     params["visualization.enable"] = node.get_parameter(
             'visualization.enable').value
     lidar_handler = LidarHandler(node, params)

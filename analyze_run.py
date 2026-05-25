@@ -2316,7 +2316,7 @@ These plots show estimated logical inter-robot SLAM communication.
 - X axis: minutes from the first recorded communication sample.
 - Y axis: serialized ROS message payload bandwidth in MB/s.
 - `bandwidth_over_time.png` sums measured communication topics per recorder sample window.
-- `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution.
+- `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution. It uses a stacked layout with total bandwidth on top and one panel per source robot below.
 - `total_mb_by_source_robot.png` appears when robot-level communication totals are available.
 - `service_graph_bandwidth_by_robot.png` appears when MRG graph service CSVs exist. It groups graph service payload bytes into 1-second ROS-time buckets and shows one panel per robot involved in graph exchanges, so graph exchanges appear as spikes.
 - In the service plot, the total panel counts each service event once; robot panels count an event for each participating robot.
@@ -2389,8 +2389,42 @@ These plots show estimated logical inter-robot SLAM communication.
                     .sum()
                     .sort_values("timestamp")
                 )
-                fig, axis = plt.subplots(figsize=(11, 5.5))
-                for robot in sorted(robot_series["source_robot"].astype(str).unique()):
+                robots = sorted(robot_series["source_robot"].astype(str).unique())
+                fig, axes = plt.subplots(
+                    len(robots) + 1,
+                    1,
+                    figsize=(11, max(5.5, 1.9 * (len(robots) + 1))),
+                    sharex=True,
+                )
+                axes = np.atleast_1d(axes)
+
+                total_by_source = (
+                    robot_series.groupby("timestamp", as_index=False)["bandwidth_Bps"]
+                    .sum()
+                    .sort_values("timestamp")
+                )
+                total_time_min = (
+                    total_by_source["timestamp"].to_numpy(dtype=float)
+                    - first_timestamp
+                ) / 60.0
+                axes[0].plot(
+                    total_time_min,
+                    total_by_source["bandwidth_Bps"].to_numpy(dtype=float)
+                    / 1_000_000.0,
+                    linewidth=2.2,
+                    color="black",
+                    label="Total source robots",
+                )
+                axes[0].set_ylabel("Total\n[MB/s]")
+                axes[0].grid(True, alpha=0.25)
+                axes[0].legend(loc="upper right", fontsize="small")
+
+                color_cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+                robot_colors = {
+                    robot: color_cycle[index % len(color_cycle)] if color_cycle else None
+                    for index, robot in enumerate(robots)
+                }
+                for robot, axis in zip(robots, axes[1:]):
                     robot_group = robot_series[
                         robot_series["source_robot"].astype(str) == robot
                     ]
@@ -2404,13 +2438,14 @@ These plots show estimated logical inter-robot SLAM communication.
                         / 1_000_000.0,
                         linewidth=1.5,
                         alpha=0.9,
+                        color=robot_colors[robot],
                         label=robot,
                     )
-                axis.set_xlabel("Time from first communication sample [min]")
-                axis.set_ylabel("Estimated logical bandwidth [MB/s]")
-                axis.grid(True, alpha=0.25)
-                axis.legend(loc="best", fontsize="small")
-                axis.set_title("Estimated communication bandwidth by source robot")
+                    axis.set_ylabel(f"{robot}\n[MB/s]")
+                    axis.grid(True, alpha=0.25)
+                    axis.legend(loc="upper right", fontsize="small")
+                axes[-1].set_xlabel("Time from first communication sample [min]")
+                fig.suptitle("Estimated communication bandwidth by source robot")
                 fig.tight_layout()
                 fig.savefig(plot_dir / "bandwidth_by_source_robot.png", dpi=160)
                 plt.close(fig)

@@ -22,6 +22,7 @@ from rclpy.node import Node
 from rclpy.clock import Clock
 
 from cslam.neighbors_manager import NeighborManager
+from cslam.simulated_rendezvous import SimulatedRendezvous
 from cslam.utils.misc import dict_to_list_chunks
 
 class GlobalDescriptorLoopClosureDetection(object):
@@ -113,6 +114,12 @@ class GlobalDescriptorLoopClosureDetection(object):
         # Listen for changes in node liveliness
         self.neighbor_manager = NeighborManager(
             self.node, self.params)
+        self.rendezvous_gate = SimulatedRendezvous(
+            self.node,
+            self.params.get('evaluation.enable_simulated_rendezvous', False),
+            self.params.get('evaluation.rendezvous_schedule_file', ''),
+            self.params['robot_id'],
+        )
 
         self.global_descriptors_buffer = SortedDict()
         self.global_descriptors_timer = self.node.create_timer(
@@ -161,11 +168,17 @@ class GlobalDescriptorLoopClosureDetection(object):
 
     def remote_neighbors_in_range(self):
         """Return remote robot IDs that are currently considered reachable."""
+        if not self.local_robot_is_in_rendezvous():
+            return []
         _, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range()
         return [
             robot_id for robot_id in neighbors_in_range_list
             if robot_id != self.params['robot_id']
         ]
+
+    def local_robot_is_in_rendezvous(self):
+        """Return whether this robot is allowed to exchange CSLAM data now."""
+        return self.rendezvous_gate.is_alive()
 
     def add_global_descriptor_to_map(self, embedding, kf_id):
         """ Add global descriptor to matching list
@@ -221,6 +234,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         """Publish global descriptors message periodically
         Doesn't publish if the descriptors are already known by neighboring robots
         """
+        if not self.local_robot_is_in_rendezvous():
+            return
         remote_neighbors = self.remote_neighbors_in_range()
         if len(self.global_descriptors_buffer) > 0 and len(remote_neighbors) > 0:
             from_kf_id = self.neighbor_manager.select_from_which_kf_to_send(
@@ -265,6 +280,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         """Publish inter-robot matches message periodically
         Doesn't publish if the inter-robot matches are already known by neighboring robots
         """
+        if not self.local_robot_is_in_rendezvous():
+            return
         remote_neighbors = self.remote_neighbors_in_range()
         if len(self.inter_robot_matches_buffer) > 0 and len(remote_neighbors) > 0:
             from_match_idx = self.neighbor_manager.select_from_which_match_to_send(
@@ -343,6 +360,8 @@ class GlobalDescriptorLoopClosureDetection(object):
             list(int): selected keyframes from other robots to match
         """
         self.inter_detect_cycles += 1
+        if not self.local_robot_is_in_rendezvous():
+            return
         neighbors_is_in_range, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range(
         )
         if self.inter_detect_cycles <= 5 or self.inter_detect_cycles % 20 == 0:
@@ -478,6 +497,10 @@ class GlobalDescriptorLoopClosureDetection(object):
         Args:
             msg (cslam_common_interfaces::msg::GlobalDescriptors): descriptors
         """
+        if not self.local_robot_is_in_rendezvous():
+            return
+        if len(msg.descriptors) == 0:
+            return
         if msg.descriptors[0].robot_id != self.params['robot_id']:
             unknown_range = self.neighbor_manager.get_unknown_range(
                 msg.descriptors)
@@ -495,6 +518,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         Args:
             msg (cslam_common_interfaces::msg::InterRobotMatches): matches
         """
+        if not self.local_robot_is_in_rendezvous():
+            return
         if msg.robot_id != self.params['robot_id']:
             for match in msg.matches:
                 edge = EdgeInterRobot(match.robot0_id, match.robot0_keyframe_id, match.robot1_id, match.robot1_keyframe_id, match.weight)
@@ -520,6 +545,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         Args:
             msg (cslam_common_interfaces::msg::InterRobotLoopClosure): Inter-robot loop closure
         """
+        if not self.local_robot_is_in_rendezvous():
+            return
         if msg.success:
             self.node.get_logger().info(
                 'New inter-robot loop closure measurement: (' +

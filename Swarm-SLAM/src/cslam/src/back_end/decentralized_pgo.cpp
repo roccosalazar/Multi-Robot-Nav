@@ -605,6 +605,10 @@ cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(co
 void DecentralizedPGO::get_pose_graph_callback(
     const cslam_common_interfaces::msg::RobotIds::ConstSharedPtr msg)
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   auto out_msg = fill_pose_graph_msg(*msg);
   pose_graph_publisher_->publish(out_msg);
   tentative_local_pose_at_latest_optimization_ = latest_local_pose_;
@@ -614,6 +618,10 @@ void DecentralizedPGO::get_pose_graph_callback(
 void DecentralizedPGO::pose_graph_callback(
     const cslam_common_interfaces::msg::PoseGraph::ConstSharedPtr msg)
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   if (optimizer_state_ == OptimizerState::WAITING_FOR_NEIGHBORS_POSEGRAPHS)
   {
     other_robots_graph_and_estimates_.insert(
@@ -702,6 +710,10 @@ std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
 
 void DecentralizedPGO::resquest_current_neighbors()
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   get_current_neighbors_publisher_->publish(std_msgs::msg::String());
 }
 
@@ -736,6 +748,10 @@ bool DecentralizedPGO::check_waiting_timeout()
 
 void DecentralizedPGO::optimization_callback()
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   if (optimizer_state_ == OptimizerState::IDLE &&
       odometry_pose_estimates_->size() > 0)
   {
@@ -854,6 +870,10 @@ void DecentralizedPGO::optimized_estimates_callback(
     const cslam_common_interfaces::msg::OptimizationResult::ConstSharedPtr
         msg)
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   if (msg->estimates.empty())
   {
     RCLCPP_WARN(node_->get_logger(), "[DEBUG_BACKEND_PIPELINE] optimized_estimates received empty estimates.");
@@ -899,6 +919,10 @@ void DecentralizedPGO::optimized_estimates_callback(
 void DecentralizedPGO::share_optimized_estimates(
     const gtsam::Values &estimates)
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   auto included_robots_ids = current_neighbors_ids_;
   included_robots_ids.robots.ids.push_back(robot_id_);
   for (unsigned int i = 0; i < included_robots_ids.robots.ids.size(); i++)
@@ -1283,7 +1307,19 @@ void DecentralizedPGO::optimization_loop_callback()
     previous_state = static_cast<int>(optimizer_state_);
   }
 
-  if (!odometry_pose_estimates_->empty())
+  const bool rendezvous_active =
+      !(enable_simulated_rendezvous_ && !sim_rdv_->is_alive());
+  if (!rendezvous_active)
+  {
+    if (optimizer_state_ != OptimizerState::IDLE)
+    {
+      end_waiting();
+      optimizer_state_ = OptimizerState::IDLE;
+      reinitialize_received_pose_graphs();
+      other_robots_graph_and_estimates_.clear();
+    }
+  }
+  else if (!odometry_pose_estimates_->empty())
   {
     if (optimizer_state_ ==
         OptimizerState::POSEGRAPH_COLLECTION)

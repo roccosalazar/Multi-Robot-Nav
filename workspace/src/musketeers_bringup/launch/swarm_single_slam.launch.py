@@ -313,6 +313,16 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
         'max_nb_robots': _get_launch_int(context, 'max_nb_robots'),
         'use_sim_time': _get_launch_bool(context, 'use_sim_time'),
     }
+    rendezvous_params = {
+        'evaluation.enable_simulated_rendezvous': _get_launch_bool(
+            context,
+            'enable_simulated_rendezvous',
+        ),
+        'evaluation.rendezvous_schedule_file': _get_launch_value(
+            context,
+            'rendezvous_schedule_file',
+        ),
+    }
 
     log_args = ['--ros-args', '--log-level', _get_launch_value(context, 'log_level')]
 
@@ -320,7 +330,7 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
         package='cslam',
         executable='loop_closure_detection_node.py',
         name='cslam_loop_closure_detection',
-        parameters=[config, common_params],
+        parameters=[config, common_params, rendezvous_params],
         namespace=namespace,
         arguments=log_args,
     )
@@ -329,7 +339,7 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
         package='cslam',
         executable='lidar_handler_node.py',
         name='cslam_map_manager',
-        parameters=[config, common_params],
+        parameters=[config, common_params, rendezvous_params],
         prefix=_get_launch_value(context, 'launch_prefix_cslam'),
         namespace=namespace,
         arguments=log_args,
@@ -342,16 +352,7 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
         parameters=[
             config,
             common_params,
-            {
-                'evaluation.enable_simulated_rendezvous': _get_launch_bool(
-                    context,
-                    'enable_simulated_rendezvous',
-                ),
-                'evaluation.rendezvous_schedule_file': _get_launch_value(
-                    context,
-                    'rendezvous_schedule_file',
-                ),
-            },
+            rendezvous_params,
         ],
         prefix=_get_launch_value(context, 'launch_prefix_cslam'),
         namespace=namespace,
