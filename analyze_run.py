@@ -2189,6 +2189,31 @@ def load_communication_topics(run_dir: Path) -> pd.DataFrame:
     return df
 
 
+def load_communication_robot_topics(run_dir: Path) -> pd.DataFrame:
+    topics_path = run_dir / "communication" / "communication_robot_topics.csv"
+    if not topics_path.is_file():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(topics_path)
+    except Exception as exc:
+        print(
+            f"Warning: could not read communication robot topics {topics_path}: {exc}",
+            file=sys.stderr,
+        )
+        return pd.DataFrame()
+    for column in [
+        "message_count",
+        "total_bytes",
+        "total_MB",
+        "average_message_size_bytes",
+        "average_bandwidth_Bps",
+        "peak_bandwidth_Bps",
+    ]:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+    return df
+
+
 def load_communication_timeseries(run_dir: Path) -> pd.DataFrame:
     timeseries_path = run_dir / "communication" / "communication_timeseries.csv"
     if not timeseries_path.is_file():
@@ -2204,12 +2229,59 @@ def load_communication_timeseries(run_dir: Path) -> pd.DataFrame:
     for column in ["timestamp", "messages", "bytes", "bandwidth_Bps"]:
         if column in df.columns:
             df[column] = pd.to_numeric(df[column], errors="coerce")
+    for column in ["traffic_class", "source_robot", "peer_robot"]:
+        if column not in df.columns:
+            df[column] = "unknown"
     return df.dropna(subset=["timestamp", "bandwidth_Bps"])
+
+
+def load_communication_services(run_dir: Path) -> pd.DataFrame:
+    service_paths = sorted((run_dir / "communication").glob("communication_services_*.csv"))
+    if not service_paths:
+        return pd.DataFrame()
+
+    frames: list[pd.DataFrame] = []
+    for path in service_paths:
+        try:
+            frame = pd.read_csv(path)
+        except Exception as exc:
+            print(
+                f"Warning: could not read communication services {path}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+        if frame.empty:
+            continue
+        frame["metrics_file"] = path.name
+        frames.append(frame)
+
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
+    for column in [
+        "timestamp_sec",
+        "request_bytes",
+        "response_bytes",
+        "total_bytes",
+        "response_keyframes",
+        "response_edges",
+        "response_cloud_bytes",
+        "request_processed_keyframes",
+        "request_processed_edges",
+    ]:
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0)
+    if "total_bytes" in df.columns:
+        fallback_total = df.get("request_bytes", 0) + df.get("response_bytes", 0)
+        df["total_bytes"] = df["total_bytes"].where(df["total_bytes"] > 0, fallback_total)
+    return df.dropna(subset=["timestamp_sec"])
 
 
 def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
     communication = load_communication_timeseries(run_dir)
-    if communication.empty:
+    services = load_communication_services(run_dir)
+    if communication.empty and services.empty:
         return
 
     try:
@@ -2243,54 +2315,219 @@ These plots show estimated logical inter-robot SLAM communication.
 
 - X axis: minutes from the first recorded communication sample.
 - Y axis: serialized ROS message payload bandwidth in MB/s.
-- The total line sums all measured communication topics per sample window.
+- `bandwidth_over_time.png` sums measured communication topics per recorder sample window.
+- `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution.
+- `total_mb_by_source_robot.png` appears when robot-level communication totals are available.
+- `service_graph_bandwidth_by_robot.png` appears when MRG graph service CSVs exist. It groups graph service payload bytes into 1-second ROS-time buckets and shows one panel per robot involved in graph exchanges, so graph exchanges appear as spikes.
+- In the service plot, the total panel counts each service event once; robot panels count an event for each participating robot.
 - This is not physical network bandwidth; DDS transport effects are outside this metric.
 """
     (plot_dir / "README.md").write_text(readme, encoding="utf-8")
 
-    communication = communication.sort_values("timestamp")
-    first_timestamp = float(communication["timestamp"].min())
-    total = (
-        communication.groupby("timestamp", as_index=False)["bandwidth_Bps"]
-        .sum()
-        .sort_values("timestamp")
-    )
-    topic_totals = (
-        communication.groupby("topic")["bytes"].sum().sort_values(ascending=False)
-    )
-    top_topics = list(topic_totals.head(5).index)
+    if not communication.empty:
+        communication = communication.sort_values("timestamp")
+        first_timestamp = float(communication["timestamp"].min())
+        total = (
+            communication.groupby("timestamp", as_index=False)["bandwidth_Bps"]
+            .sum()
+            .sort_values("timestamp")
+        )
+        topic_totals = (
+            communication.groupby("topic")["bytes"].sum().sort_values(ascending=False)
+        )
+        top_topics = list(topic_totals.head(5).index)
+        topic_series = (
+            communication.groupby(["timestamp", "topic"], as_index=False)["bandwidth_Bps"]
+            .sum()
+            .sort_values("timestamp")
+        )
 
-    fig, axis = plt.subplots(figsize=(11, 5.5))
-    total_time_min = (
-        total["timestamp"].to_numpy(dtype=float) - first_timestamp
-    ) / 60.0
-    axis.plot(
-        total_time_min,
-        total["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
-        label="Total",
-        linewidth=2.2,
-        color="black",
-    )
-    for topic in top_topics:
-        topic_group = communication[communication["topic"] == topic]
-        topic_time_min = (
-            topic_group["timestamp"].to_numpy(dtype=float) - first_timestamp
+        fig, axis = plt.subplots(figsize=(11, 5.5))
+        total_time_min = (
+            total["timestamp"].to_numpy(dtype=float) - first_timestamp
         ) / 60.0
         axis.plot(
-            topic_time_min,
-            topic_group["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
-            linewidth=1.3,
-            alpha=0.8,
-            label=topic,
+            total_time_min,
+            total["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+            label="Total",
+            linewidth=2.2,
+            color="black",
         )
-    axis.set_xlabel("Time from first communication sample [min]")
-    axis.set_ylabel("Estimated logical bandwidth [MB/s]")
-    axis.grid(True, alpha=0.25)
-    axis.legend(loc="best", fontsize="small")
-    axis.set_title("Estimated logical inter-robot SLAM communication")
-    fig.tight_layout()
-    fig.savefig(plot_dir / "bandwidth_over_time.png", dpi=160)
-    plt.close(fig)
+        for topic in top_topics:
+            topic_group = topic_series[topic_series["topic"] == topic]
+            topic_time_min = (
+                topic_group["timestamp"].to_numpy(dtype=float) - first_timestamp
+            ) / 60.0
+            axis.plot(
+                topic_time_min,
+                topic_group["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+                linewidth=1.3,
+                alpha=0.8,
+                label=topic,
+            )
+        axis.set_xlabel("Time from first communication sample [min]")
+        axis.set_ylabel("Estimated logical bandwidth [MB/s]")
+        axis.grid(True, alpha=0.25)
+        axis.legend(loc="best", fontsize="small")
+        axis.set_title("Estimated logical inter-robot SLAM communication")
+        fig.tight_layout()
+        fig.savefig(plot_dir / "bandwidth_over_time.png", dpi=160)
+        plt.close(fig)
+
+        if "source_robot" in communication.columns:
+            known_sources = communication[
+                ~communication["source_robot"].astype(str).isin(
+                    ["", "unknown", "broadcast", "multiple"]
+                )
+            ].copy()
+            if not known_sources.empty:
+                robot_series = (
+                    known_sources.groupby(
+                        ["timestamp", "source_robot"],
+                        as_index=False,
+                    )["bandwidth_Bps"]
+                    .sum()
+                    .sort_values("timestamp")
+                )
+                fig, axis = plt.subplots(figsize=(11, 5.5))
+                for robot in sorted(robot_series["source_robot"].astype(str).unique()):
+                    robot_group = robot_series[
+                        robot_series["source_robot"].astype(str) == robot
+                    ]
+                    robot_time_min = (
+                        robot_group["timestamp"].to_numpy(dtype=float)
+                        - first_timestamp
+                    ) / 60.0
+                    axis.plot(
+                        robot_time_min,
+                        robot_group["bandwidth_Bps"].to_numpy(dtype=float)
+                        / 1_000_000.0,
+                        linewidth=1.5,
+                        alpha=0.9,
+                        label=robot,
+                    )
+                axis.set_xlabel("Time from first communication sample [min]")
+                axis.set_ylabel("Estimated logical bandwidth [MB/s]")
+                axis.grid(True, alpha=0.25)
+                axis.legend(loc="best", fontsize="small")
+                axis.set_title("Estimated communication bandwidth by source robot")
+                fig.tight_layout()
+                fig.savefig(plot_dir / "bandwidth_by_source_robot.png", dpi=160)
+                plt.close(fig)
+
+    robot_topics = load_communication_robot_topics(run_dir)
+    if not robot_topics.empty and {"source_robot", "total_bytes"}.issubset(
+        robot_topics.columns
+    ):
+        source_totals = (
+            robot_topics[
+                ~robot_topics["source_robot"].astype(str).isin(
+                    ["", "unknown", "broadcast", "multiple"]
+                )
+            ]
+            .groupby("source_robot", as_index=False)["total_bytes"]
+            .sum()
+            .sort_values("total_bytes", ascending=False)
+        )
+        if not source_totals.empty:
+            fig, axis = plt.subplots(figsize=(8.5, 4.8))
+            axis.bar(
+                source_totals["source_robot"].astype(str),
+                source_totals["total_bytes"].to_numpy(dtype=float) / 1_000_000.0,
+            )
+            axis.set_xlabel("Source robot")
+            axis.set_ylabel("Estimated TX total [MB]")
+            axis.grid(True, axis="y", alpha=0.25)
+            axis.set_title("Estimated communication total by source robot")
+            fig.tight_layout()
+            fig.savefig(plot_dir / "total_mb_by_source_robot.png", dpi=160)
+            plt.close(fig)
+
+    if not services.empty and {"timestamp_sec", "source_robot", "total_bytes"}.issubset(
+        services.columns
+    ):
+        bucket_sec = 1.0
+        services = services.sort_values("timestamp_sec").copy()
+        first_service_time = float(services["timestamp_sec"].min())
+        min_bucket = math.floor(first_service_time / bucket_sec) * bucket_sec
+        max_bucket = math.ceil(float(services["timestamp_sec"].max()) / bucket_sec) * bucket_sec
+        services["bucket_sec"] = (
+            np.floor(services["timestamp_sec"].to_numpy(dtype=float) / bucket_sec)
+            * bucket_sec
+        )
+        participant_frames = []
+        source_bytes = services[["bucket_sec", "source_robot", "total_bytes"]].rename(
+            columns={"source_robot": "robot"}
+        )
+        participant_frames.append(source_bytes)
+        if "peer_robot" in services.columns:
+            peer_bytes = services[["bucket_sec", "peer_robot", "total_bytes"]].rename(
+                columns={"peer_robot": "robot"}
+            )
+            participant_frames.append(peer_bytes)
+        robot_services = pd.concat(participant_frames, ignore_index=True)
+        robot_services = robot_services.dropna(subset=["robot"])
+        robot_services = robot_services[robot_services["robot"].astype(str) != ""]
+        per_robot = (
+            robot_services.groupby(["bucket_sec", "robot"], as_index=False)["total_bytes"]
+            .sum()
+            .sort_values("bucket_sec")
+        )
+        buckets = np.arange(min_bucket, max_bucket + bucket_sec, bucket_sec)
+
+        total_by_bucket = (
+            services.groupby("bucket_sec")["total_bytes"].sum().reindex(buckets, fill_value=0)
+        )
+        time_min = (buckets - first_service_time) / 60.0
+        robots = sorted(per_robot["robot"].dropna().astype(str).unique())
+        fig, axes = plt.subplots(
+            len(robots) + 1,
+            1,
+            figsize=(11, max(5.5, 1.9 * (len(robots) + 1))),
+            sharex=True,
+        )
+        axes = np.atleast_1d(axes)
+        total_axis = axes[0]
+        total_axis.step(
+            time_min,
+            total_by_bucket.to_numpy(dtype=float) / bucket_sec / 1_000_000.0,
+            where="post",
+            label="Total graph services",
+            linewidth=2.2,
+            color="black",
+        )
+        total_axis.set_ylabel("Total\n[MB/s]")
+        total_axis.grid(True, alpha=0.25)
+        total_axis.legend(loc="upper right", fontsize="small")
+
+        color_cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+        robot_colors = {
+            robot: color_cycle[index % len(color_cycle)] if color_cycle else None
+            for index, robot in enumerate(robots)
+        }
+        for robot, axis in zip(robots, axes[1:]):
+            robot_bytes = (
+                per_robot[per_robot["robot"].astype(str) == robot]
+                .set_index("bucket_sec")["total_bytes"]
+                .reindex(buckets, fill_value=0)
+            )
+            axis.step(
+                time_min,
+                robot_bytes.to_numpy(dtype=float) / bucket_sec / 1_000_000.0,
+                where="post",
+                linewidth=1.5,
+                alpha=0.85,
+                color=robot_colors[robot],
+                label=robot,
+            )
+            axis.set_ylabel(f"{robot}\n[MB/s]")
+            axis.grid(True, alpha=0.25)
+            axis.legend(loc="upper right", fontsize="small")
+        axes[-1].set_xlabel("Time from first graph service event [min, ROS time]")
+        fig.suptitle("MRG graph service communication by robot")
+        fig.tight_layout()
+        fig.savefig(plot_dir / "service_graph_bandwidth_by_robot.png", dpi=160)
+        plt.close(fig)
 
 
 def make_plots(metrics: pd.DataFrame, point_errors: dict[tuple[str, int], pd.DataFrame], output_dir: Path) -> None:
@@ -2954,6 +3191,7 @@ def write_report(
     loop_diagnostics: pd.DataFrame,
     communication_summary: dict[str, object] | None,
     communication_topics: pd.DataFrame,
+    communication_robot_topics: pd.DataFrame,
 ) -> None:
     report_path = output_dir / "report.md"
     lines: list[str] = []
@@ -3294,6 +3532,99 @@ def write_report(
             lines.append("Biggest measured communication topics:")
             lines.append("")
             lines.append(dataframe_to_markdown(top_topics[existing], floatfmt=".4f"))
+
+        per_robot_tx = communication_summary.get("per_robot_tx_estimate", {})
+        per_robot_rx = communication_summary.get("per_robot_rx_estimate", {})
+        per_robot_unknown = communication_summary.get(
+            "per_robot_unknown_bytes",
+            {},
+        )
+        if isinstance(per_robot_tx, dict) and per_robot_tx:
+            rx_keys = per_robot_rx.keys() if isinstance(per_robot_rx, dict) else []
+            unknown_keys = (
+                per_robot_unknown.keys()
+                if isinstance(per_robot_unknown, dict)
+                else []
+            )
+            robots = sorted(
+                {
+                    *[str(key) for key in per_robot_tx.keys()],
+                    *[str(key) for key in rx_keys],
+                    *[str(key) for key in unknown_keys],
+                }
+            )
+            robot_rows = []
+            for robot in robots:
+                tx_bytes = float(per_robot_tx.get(robot, 0) or 0)
+                rx_bytes = (
+                    float(per_robot_rx.get(robot, 0) or 0)
+                    if isinstance(per_robot_rx, dict)
+                    else 0.0
+                )
+                unknown_bytes = (
+                    float(per_robot_unknown.get(robot, 0) or 0)
+                    if isinstance(per_robot_unknown, dict)
+                    else 0.0
+                )
+                robot_rows.append(
+                    {
+                        "robot": robot,
+                        "tx_estimate_MB": tx_bytes / 1_000_000.0,
+                        "rx_estimate_MB": rx_bytes / 1_000_000.0,
+                        "unknown_peer_MB": unknown_bytes / 1_000_000.0,
+                    }
+                )
+            lines.append("")
+            lines.append("Per-robot communication attribution:")
+            lines.append("")
+            lines.append(dataframe_to_markdown(pd.DataFrame(robot_rows), floatfmt=".4f"))
+            unattributed_bytes = float(
+                communication_summary.get("unattributed_bytes", 0) or 0
+            )
+            combined_bytes = float(
+                communication_summary.get("combined_total_bytes", 0) or 0
+            )
+            if combined_bytes > 0.0 and unattributed_bytes / combined_bytes > 0.05:
+                lines.append("")
+                lines.append(
+                    f"Warning: {unattributed_bytes / 1_000_000.0:.4f} MB "
+                    "of communication could not be attributed to a source robot."
+                )
+
+        if not communication_robot_topics.empty:
+            top_robot_topics = communication_robot_topics.sort_values(
+                "total_bytes",
+                ascending=False,
+            ).head(12)
+            display_columns = [
+                "source_robot",
+                "peer_robot",
+                "topic",
+                "traffic_class",
+                "message_count",
+                "total_MB",
+                "average_bandwidth_Bps",
+                "peak_bandwidth_Bps",
+            ]
+            existing = [
+                column
+                for column in display_columns
+                if column in top_robot_topics.columns
+            ]
+            lines.append("")
+            lines.append("Top per-robot communication topics:")
+            lines.append("")
+            lines.append(
+                dataframe_to_markdown(top_robot_topics[existing], floatfmt=".4f")
+            )
+
+        attribution_notes = communication_summary.get("attribution_notes", [])
+        if attribution_notes:
+            lines.append("")
+            lines.append("Attribution notes:")
+            lines.append("")
+            for item in attribution_notes:
+                lines.append(f"- {item}")
         notes_and_warnings = [
             *communication_summary.get("notes", []),
             *communication_summary.get("warnings", []),
@@ -3328,12 +3659,13 @@ def write_report(
     lines.append(
         "- `plots/`: PNG plots grouped by type (`ate_loops/`, `loop_quality/`, "
         "`rendezvous/`, `graph_correction/`, `rpe/`, `trajectory/`, "
-        "`final_ate/`). Each folder includes a `README.md` explaining the plots."
+        "`final_ate/`, `communication/`). Each folder includes a `README.md` "
+        "explaining the plots."
     )
     if communication_summary is not None:
         lines.append(
             "- `communication/`: estimated logical inter-robot communication "
-            "summary, topic totals, and bandwidth time series."
+            "summary, topic/service totals, and bandwidth time series."
         )
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -3540,6 +3872,7 @@ def analyze(args: argparse.Namespace) -> Path:
     summary = final_summary(metrics)
     communication_summary = load_communication_summary(run_dir)
     communication_topics = load_communication_topics(run_dir)
+    communication_robot_topics = load_communication_robot_topics(run_dir)
 
     metrics.to_csv(output_dir / "ate_timeseries.csv", index=False)
     transforms.to_csv(output_dir / "alignment_transforms.csv", index=False)
@@ -3562,6 +3895,7 @@ def analyze(args: argparse.Namespace) -> Path:
         loop_diagnostics=loop_diagnostics,
         communication_summary=communication_summary,
         communication_topics=communication_topics,
+        communication_robot_topics=communication_robot_topics,
     )
     return output_dir
 

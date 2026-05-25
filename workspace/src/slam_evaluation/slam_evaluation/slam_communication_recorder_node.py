@@ -39,14 +39,38 @@ class TopicStats:
     peak_bandwidth_bps: float = 0.0
 
 
+@dataclass
+class RobotTopicStats:
+    message_type: str
+    message_count: int = 0
+    total_bytes: int = 0
+    window_messages: int = 0
+    window_bytes: int = 0
+    peak_bandwidth_bps: float = 0.0
+
+
+@dataclass(frozen=True)
+class RobotAttribution:
+    traffic_class: str
+    source_robot: str
+    peer_robot: str
+    source_method: str = 'unknown'
+    peer_method: str = 'unknown'
+
+
 class SlamCommunicationRecorder(Node):
     """Estimate logical inter-robot SLAM communication."""
 
     SUMMARY_FILE = 'communication_summary.json'
     TOPICS_FILE = 'communication_topics.csv'
+    ROBOT_TOPICS_FILE = 'communication_robot_topics.csv'
     TIMESERIES_FILE = 'communication_timeseries.csv'
     EVENTS_FILE = 'communication_events.csv'
     SERVICES_FILE_GLOB = 'communication_services*.csv'
+
+    UNKNOWN_ROBOT = 'unknown'
+    BROADCAST_ROBOT = 'broadcast'
+    MULTIPLE_ROBOTS = 'multiple'
 
     TOPICS_HEADER = [
         'topic',
@@ -61,7 +85,12 @@ class SlamCommunicationRecorder(Node):
 
     TIMESERIES_HEADER = [
         'timestamp',
+        'window_start',
+        'window_end',
         'topic',
+        'traffic_class',
+        'source_robot',
+        'peer_robot',
         'messages',
         'bytes',
         'bandwidth_Bps',
@@ -71,7 +100,24 @@ class SlamCommunicationRecorder(Node):
         'timestamp',
         'topic',
         'message_type',
-        'bytes',
+        'traffic_class',
+        'source_robot',
+        'peer_robot',
+        'message_bytes',
+    ]
+
+    ROBOT_TOPICS_HEADER = [
+        'source_robot',
+        'peer_robot',
+        'topic',
+        'traffic_class',
+        'message_type',
+        'message_count',
+        'total_bytes',
+        'total_MB',
+        'average_message_size_bytes',
+        'average_bandwidth_Bps',
+        'peak_bandwidth_Bps',
     ]
 
     MRG_SERVICE_PATTERN = re.compile(
@@ -117,6 +163,10 @@ class SlamCommunicationRecorder(Node):
 
         self._communication_subscriptions = {}
         self._topic_stats: dict[str, TopicStats] = {}
+        self._robot_topic_stats: dict[
+            tuple[str, str, str, str],
+            RobotTopicStats,
+        ] = {}
         self._topic_type_failures: set[str] = set()
         self._serialization_failures: set[str] = set()
         self._detected_mrg_services: set[str] = set()
@@ -319,8 +369,9 @@ class SlamCommunicationRecorder(Node):
             "DDS or network bandwidth."
         )
         self._record_warning(
-            "Per-topic totals are recorded; source and destination robots are "
-            "not inferred in this passive recorder."
+            "Per-topic totals are recorded. Source robots are inferred from "
+            "message payloads or topic namespaces when possible; destinations "
+            "remain broadcast or unknown when the payload does not encode them."
         )
         if self.slam_type in ('auto', 'mrg'):
             self._record_warning(
@@ -420,6 +471,329 @@ class SlamCommunicationRecorder(Node):
                 "passively measured by this topic recorder."
             )
 
+    def _traffic_class_for_topic(self, topic: str) -> str:
+        stripped = topic.strip('/')
+        if 'global_descriptors' in stripped:
+            return 'global_descriptors'
+        if 'local_descriptors_request' in stripped:
+            return 'local_descriptors_request'
+        if 'local_descriptors' in stripped:
+            return 'local_descriptors'
+        if 'inter_robot_matches' in stripped:
+            return 'inter_robot_matches'
+        if 'inter_robot_loop_closure' in stripped:
+            return 'inter_robot_loop_closure'
+        if stripped.endswith('pose_graph') or '/pose_graph' in stripped:
+            return 'pose_graph'
+        if 'optimized_estimates' in stripped:
+            return 'optimized_estimates'
+        if 'heartbeat' in stripped:
+            return 'heartbeat'
+        if 'get_pose_graph' in stripped:
+            return 'get_pose_graph'
+        if 'mrg_slam' in stripped:
+            return 'mrg_pose_broadcast'
+        return 'topic'
+
+    def _topic_robot(self, topic: str) -> str | None:
+        parts = [part for part in topic.strip('/').split('/') if part]
+        if not parts:
+            return None
+        first = parts[0]
+        robot_names = {name.strip('/') for name in self.robot_names}
+        if first in robot_names:
+            return first
+        if re.fullmatch(r'r\d+', first):
+            return first
+        return None
+
+    def _robot_name_from_value(self, value: object) -> str | None:
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, str):
+            stripped = value.strip().strip('/')
+            if not stripped:
+                return None
+            if stripped in self.robot_names:
+                return stripped
+            match = re.fullmatch(r'(?:robot|r)?(\d+)', stripped)
+            if match:
+                return self._robot_name_from_value(int(match.group(1)))
+            return stripped
+        try:
+            robot_id = int(value)
+        except (TypeError, ValueError):
+            return None
+        if robot_id < 0:
+            return None
+        candidate = f'r{robot_id}'
+        if candidate in self.robot_names:
+            return candidate
+        if robot_id < len(self.robot_names):
+            return self.robot_names[robot_id].strip('/')
+        return candidate
+
+    def _message_field_names(self, value: object) -> list[str]:
+        if hasattr(value, 'get_fields_and_field_types'):
+            try:
+                return list(value.get_fields_and_field_types().keys())
+            except Exception:
+                return []
+        slots = getattr(value, '__slots__', [])
+        names = []
+        for slot in slots:
+            name = str(slot)
+            if name.startswith('_'):
+                name = name[1:]
+            if name:
+                names.append(name)
+        return names
+
+    def _is_sequence_value(self, value: object) -> bool:
+        return (
+            hasattr(value, '__iter__')
+            and not isinstance(value, (str, bytes, bytearray, dict))
+        )
+
+    def _unique_robot_from_values(self, values: list[str]) -> tuple[str, str]:
+        unique = sorted({value for value in values if value})
+        if len(unique) == 1:
+            return unique[0], 'payload'
+        if len(unique) > 1:
+            return self.MULTIPLE_ROBOTS, 'payload_multiple'
+        return self.UNKNOWN_ROBOT, 'unknown'
+
+    def _direct_robot_field(self, msg: object, names: list[str]) -> tuple[str, str]:
+        for name in names:
+            if not hasattr(msg, name):
+                continue
+            robot = self._robot_name_from_value(getattr(msg, name))
+            if robot:
+                return robot, f'payload.{name}'
+        return self.UNKNOWN_ROBOT, 'unknown'
+
+    def _robots_from_sequence_field(
+        self,
+        msg: object,
+        name: str,
+    ) -> list[str]:
+        if not hasattr(msg, name):
+            return []
+        value = getattr(msg, name)
+        if not self._is_sequence_value(value):
+            robot = self._robot_name_from_value(value)
+            return [robot] if robot else []
+        robots = []
+        for item in list(value)[:64]:
+            robot = self._robot_name_from_value(item)
+            if robot:
+                robots.append(robot)
+        return robots
+
+    def _nested_robot_values(
+        self,
+        value: object,
+        field_names: set[str],
+        depth: int = 0,
+    ) -> list[str]:
+        if depth > 3 or value is None:
+            return []
+        if isinstance(value, (str, bytes, bytearray, bool, int, float)):
+            return []
+        if self._is_sequence_value(value):
+            robots: list[str] = []
+            for item in list(value)[:64]:
+                robots.extend(
+                    self._nested_robot_values(item, field_names, depth + 1)
+                )
+            return robots
+
+        skip_fields = {
+            'data',
+            'pointcloud',
+            'image',
+            'rgb',
+            'depth',
+            'descriptor',
+            'transform',
+            'pose',
+            'covariance',
+            'values',
+            'edges',
+            'factors',
+            'estimates',
+            'gps_values',
+        }
+        robots = []
+        for field_name in self._message_field_names(value):
+            if field_name in skip_fields:
+                continue
+            try:
+                field_value = getattr(value, field_name)
+            except Exception:
+                continue
+            if field_name in field_names:
+                if self._is_sequence_value(field_value):
+                    for item in list(field_value)[:64]:
+                        robot = self._robot_name_from_value(item)
+                        if robot:
+                            robots.append(robot)
+                else:
+                    robot = self._robot_name_from_value(field_value)
+                    if robot:
+                        robots.append(robot)
+                continue
+            robots.extend(
+                self._nested_robot_values(field_value, field_names, depth + 1)
+            )
+        return robots
+
+    def _infer_robot_identity(
+        self,
+        topic: str,
+        msg: object,
+    ) -> RobotAttribution:
+        traffic_class = self._traffic_class_for_topic(topic)
+        topic_robot = self._topic_robot(topic)
+        source_robot = self.UNKNOWN_ROBOT
+        peer_robot = self.UNKNOWN_ROBOT
+        source_method = 'unknown'
+        peer_method = 'unknown'
+
+        if traffic_class == 'inter_robot_loop_closure':
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot0_id'],
+            )
+            peer_robot, peer_method = self._direct_robot_field(
+                msg,
+                ['robot1_id'],
+            )
+        elif traffic_class == 'inter_robot_matches':
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot_id'],
+            )
+            match_robots = self._nested_robot_values(
+                getattr(msg, 'matches', []),
+                {'robot0_id', 'robot1_id'},
+            )
+            peer_candidates = [
+                robot for robot in match_robots if robot != source_robot
+            ]
+            peer_robot, peer_method = self._unique_robot_from_values(
+                peer_candidates
+            )
+        elif traffic_class in ('local_descriptors', 'global_descriptors'):
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot_id'],
+            )
+            if source_robot == self.UNKNOWN_ROBOT:
+                descriptor_robots = self._nested_robot_values(
+                    msg,
+                    {'robot_id'},
+                )
+                source_robot, source_method = self._unique_robot_from_values(
+                    descriptor_robots
+                )
+            match_robots = self._robots_from_sequence_field(
+                msg,
+                'matches_robot_id',
+            )
+            peer_robot, peer_method = self._unique_robot_from_values(match_robots)
+        elif traffic_class == 'pose_graph':
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot_id', 'origin_robot_id'],
+            )
+            connected = getattr(getattr(msg, 'connected_robots', None), 'ids', [])
+            peer_robot, peer_method = self._unique_robot_from_values(
+                [
+                    robot
+                    for robot in (
+                        self._robot_name_from_value(value) for value in connected
+                    )
+                    if robot
+                ]
+            )
+        elif traffic_class == 'optimized_estimates':
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot_id', 'source_robot_id', 'sender_id', 'origin_robot_id'],
+            )
+        elif traffic_class == 'heartbeat':
+            if topic_robot:
+                source_robot = topic_robot
+                source_method = 'topic_namespace'
+                peer_robot = self.BROADCAST_ROBOT
+                peer_method = 'heartbeat_topic'
+            elif hasattr(msg, 'data'):
+                robot = self._robot_name_from_value(getattr(msg, 'data'))
+                if robot:
+                    source_robot = robot
+                    source_method = 'payload.data'
+                    peer_robot = self.BROADCAST_ROBOT
+                    peer_method = 'heartbeat_topic'
+        elif traffic_class in ('get_pose_graph', 'local_descriptors_request'):
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['robot_id', 'source_robot_id', 'sender_id', 'origin_robot_id'],
+            )
+            match_robots = self._robots_from_sequence_field(
+                msg,
+                'matches_robot_id',
+            )
+            peer_robot, peer_method = self._unique_robot_from_values(match_robots)
+        else:
+            source_robot, source_method = self._direct_robot_field(
+                msg,
+                ['source_robot', 'source_robot_id', 'sender_robot',
+                 'sender_id', 'robot_name', 'robot_id', 'origin_robot_id'],
+            )
+
+        if source_robot in (self.UNKNOWN_ROBOT, self.MULTIPLE_ROBOTS):
+            nested = self._nested_robot_values(
+                msg,
+                {
+                    'source_robot',
+                    'source_robot_id',
+                    'sender_robot',
+                    'sender_id',
+                    'robot_name',
+                    'robot_id',
+                    'origin_robot_id',
+                },
+            )
+            nested_robot, nested_method = self._unique_robot_from_values(nested)
+            if nested_robot != self.UNKNOWN_ROBOT:
+                source_robot = nested_robot
+                source_method = nested_method
+
+        if source_robot == self.UNKNOWN_ROBOT and topic_robot:
+            source_robot = topic_robot
+            source_method = 'topic_namespace'
+
+        if peer_robot == self.UNKNOWN_ROBOT:
+            if topic_robot and topic_robot != source_robot:
+                peer_robot = topic_robot
+                peer_method = 'topic_namespace'
+            elif topic.startswith('/cslam/'):
+                peer_robot = self.BROADCAST_ROBOT
+                peer_method = 'global_topic'
+
+        if peer_robot == source_robot and topic.startswith('/cslam/'):
+            peer_robot = self.BROADCAST_ROBOT
+            peer_method = 'global_topic'
+
+        return RobotAttribution(
+            traffic_class=traffic_class,
+            source_robot=source_robot or self.UNKNOWN_ROBOT,
+            peer_robot=peer_robot or self.UNKNOWN_ROBOT,
+            source_method=source_method,
+            peer_method=peer_method,
+        )
+
     def _message_callback(
         self,
         msg,
@@ -447,18 +821,38 @@ class SlamCommunicationRecorder(Node):
         stats.window_messages += 1
         stats.window_bytes += message_bytes
 
+        attribution = self._infer_robot_identity(topic, msg)
+        robot_key = (
+            topic,
+            attribution.traffic_class,
+            attribution.source_robot,
+            attribution.peer_robot,
+        )
+        robot_stats = self._robot_topic_stats.setdefault(
+            robot_key,
+            RobotTopicStats(message_type_name),
+        )
+        robot_stats.message_count += 1
+        robot_stats.total_bytes += message_bytes
+        robot_stats.window_messages += 1
+        robot_stats.window_bytes += message_bytes
+
         if self._events_writer is not None:
             self._events_writer.writerow(
                 [
                     f'{now_wall_time():.9f}',
                     topic,
                     message_type_name,
+                    attribution.traffic_class,
+                    attribution.source_robot,
+                    attribution.peer_robot,
                     message_bytes,
                 ]
             )
 
     def _sample_timer_callback(self) -> None:
         now = now_wall_time()
+        window_start = self._last_sample_time
         elapsed = max(now - self._last_sample_time, 1e-9)
         self._last_sample_time = now
         total_window_bytes = 0
@@ -472,10 +866,31 @@ class SlamCommunicationRecorder(Node):
                 bandwidth_bps,
             )
             total_window_bytes += stats.window_bytes
+            stats.window_messages = 0
+            stats.window_bytes = 0
+
+        for (
+            topic,
+            traffic_class,
+            source_robot,
+            peer_robot,
+        ), stats in sorted(self._robot_topic_stats.items()):
+            if stats.window_messages == 0 and stats.window_bytes == 0:
+                continue
+            bandwidth_bps = float(stats.window_bytes) / elapsed
+            stats.peak_bandwidth_bps = max(
+                stats.peak_bandwidth_bps,
+                bandwidth_bps,
+            )
             self._timeseries_writer.writerow(
                 [
                     f'{now:.9f}',
+                    f'{window_start:.9f}',
+                    f'{now:.9f}',
                     topic,
+                    traffic_class,
+                    source_robot,
+                    peer_robot,
                     stats.window_messages,
                     stats.window_bytes,
                     f'{bandwidth_bps:.9f}',
@@ -503,6 +918,9 @@ class SlamCommunicationRecorder(Node):
         service_metrics, service_files = self._load_service_metrics()
         service_total_bytes = service_metrics['service_total_bytes']
         combined_total_bytes = total_bytes + service_total_bytes
+        robot_tx, robot_rx, robot_unknown, unattributed_bytes = (
+            self._robot_attribution_summary()
+        )
 
         warnings = sorted(self._warnings)
         if total_messages == 0:
@@ -546,6 +964,29 @@ class SlamCommunicationRecorder(Node):
             'measured_topic_count': len(self._topic_stats),
             'subscribed_topics': sorted(self._topic_stats),
             'detected_relevant_services': sorted(self._detected_mrg_services),
+            'per_robot_tx_estimate': robot_tx,
+            'per_robot_rx_estimate': robot_rx,
+            'per_robot_unknown_bytes': robot_unknown,
+            'unattributed_bytes': unattributed_bytes,
+            'unattributed_MB': self._bytes_to_mb(unattributed_bytes),
+            'attribution_notes': [
+                (
+                    'source_robot is inferred from Swarm payload fields such '
+                    'as robot_id/origin_robot_id when present, otherwise from '
+                    'the topic namespace when possible.'
+                ),
+                (
+                    'peer_robot is only filled when a destination/peer is '
+                    'explicitly inferable. Global Swarm topics usually use '
+                    'peer_robot=broadcast.'
+                ),
+                (
+                    'per_robot_tx_estimate is a logical serialized payload '
+                    'estimate grouped by inferred source_robot; '
+                    'per_robot_rx_estimate is only populated for concrete '
+                    'peer_robot values and is therefore a lower bound.'
+                ),
+            ],
             'notes': [
                 (
                     'Bandwidth uses wall-clock time and serialized ROS '
@@ -597,6 +1038,88 @@ class SlamCommunicationRecorder(Node):
                         f'{stats.peak_bandwidth_bps:.9f}',
                     ]
                 )
+
+        with (self.output_dir / self.ROBOT_TOPICS_FILE).open(
+            'w',
+            newline='',
+            encoding='utf-8',
+        ) as robot_topics_file:
+            writer = csv.writer(robot_topics_file)
+            writer.writerow(self.ROBOT_TOPICS_HEADER)
+            for (
+                topic,
+                traffic_class,
+                source_robot,
+                peer_robot,
+            ), stats in sorted(
+                self._robot_topic_stats.items(),
+                key=lambda item: (-item[1].total_bytes, item[0]),
+            ):
+                avg_message_size = (
+                    float(stats.total_bytes) / float(stats.message_count)
+                    if stats.message_count > 0
+                    else 0.0
+                )
+                average_topic_bps = (
+                    float(stats.total_bytes) / duration
+                    if duration > 0.0
+                    else 0.0
+                )
+                writer.writerow(
+                    [
+                        source_robot,
+                        peer_robot,
+                        topic,
+                        traffic_class,
+                        stats.message_type,
+                        stats.message_count,
+                        stats.total_bytes,
+                        f'{self._bytes_to_mb(stats.total_bytes):.9f}',
+                        f'{avg_message_size:.9f}',
+                        f'{average_topic_bps:.9f}',
+                        f'{stats.peak_bandwidth_bps:.9f}',
+                    ]
+                )
+
+    def _is_concrete_robot(self, value: str) -> bool:
+        return value not in (
+            '',
+            self.UNKNOWN_ROBOT,
+            self.BROADCAST_ROBOT,
+            self.MULTIPLE_ROBOTS,
+        )
+
+    def _robot_attribution_summary(
+        self,
+    ) -> tuple[dict[str, int], dict[str, int], dict[str, int], int]:
+        robot_tx = {name.strip('/'): 0 for name in self.robot_names}
+        robot_rx = {name.strip('/'): 0 for name in self.robot_names}
+        robot_unknown = {name.strip('/'): 0 for name in self.robot_names}
+        unattributed_bytes = 0
+
+        for (
+            _topic,
+            _traffic_class,
+            source_robot,
+            peer_robot,
+        ), stats in self._robot_topic_stats.items():
+            if self._is_concrete_robot(source_robot):
+                robot_tx[source_robot] = (
+                    robot_tx.get(source_robot, 0) + stats.total_bytes
+                )
+                if not self._is_concrete_robot(peer_robot):
+                    robot_unknown[source_robot] = (
+                        robot_unknown.get(source_robot, 0) + stats.total_bytes
+                    )
+            else:
+                unattributed_bytes += stats.total_bytes
+
+            if self._is_concrete_robot(peer_robot):
+                robot_rx[peer_robot] = (
+                    robot_rx.get(peer_robot, 0) + stats.total_bytes
+                )
+
+        return robot_tx, robot_rx, robot_unknown, unattributed_bytes
 
     def _load_service_metrics(self) -> tuple[dict[str, int], list[Path]]:
         service_files = sorted(self.output_dir.glob(self.SERVICES_FILE_GLOB))
@@ -680,7 +1203,8 @@ def main(args=None) -> None:
     finally:
         node.close()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
