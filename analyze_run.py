@@ -2278,6 +2278,40 @@ def load_communication_services(run_dir: Path) -> pd.DataFrame:
     return df.dropna(subset=["timestamp_sec"])
 
 
+def communication_time_reference(
+    run_dir: Path,
+) -> tuple[np.ndarray | None, np.ndarray | None, float | None, float | None]:
+    """Return ground-truth wall/ROS time samples for communication plot alignment."""
+    ground_truth = load_ground_truth(run_dir)
+    if not ground_truth:
+        return None, None, None, None
+
+    wall_parts = []
+    ros_parts = []
+    for gt in ground_truth.values():
+        if len(gt.wall_time) == 0 or len(gt.ros_time) == 0:
+            continue
+        wall_parts.append(gt.wall_time)
+        ros_parts.append(gt.ros_time)
+    if not wall_parts or not ros_parts:
+        return None, None, None, None
+
+    wall_time = np.concatenate(wall_parts).astype(float)
+    ros_time = np.concatenate(ros_parts).astype(float)
+    finite = np.isfinite(wall_time) & np.isfinite(ros_time)
+    wall_time = wall_time[finite]
+    ros_time = ros_time[finite]
+    if len(wall_time) == 0:
+        return None, None, None, None
+
+    order = np.argsort(wall_time)
+    wall_time = wall_time[order]
+    ros_time = ros_time[order]
+    unique_wall, unique_indices = np.unique(wall_time, return_index=True)
+    unique_ros = ros_time[unique_indices]
+    return unique_wall, unique_ros, float(np.nanmin(ros_time)), float(np.nanmax(ros_time))
+
+
 def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
     communication = load_communication_timeseries(run_dir)
     services = load_communication_services(run_dir)
@@ -2309,11 +2343,40 @@ def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
     for path in plot_dir.glob("*.png"):
         path.unlink()
 
+    gt_wall_time, gt_ros_time, run_start_ros_time, run_end_ros_time = (
+        communication_time_reference(run_dir)
+    )
+    run_duration_min = None
+    if run_start_ros_time is not None and run_end_ros_time is not None:
+        run_duration_min = max((run_end_ros_time - run_start_ros_time) / 60.0, 0.0)
+
+    def wall_timestamps_to_run_minutes(values: np.ndarray) -> np.ndarray:
+        values = values.astype(float)
+        if (
+            gt_wall_time is not None
+            and gt_ros_time is not None
+            and run_start_ros_time is not None
+            and len(gt_wall_time) >= 2
+        ):
+            ros_values = np.interp(values, gt_wall_time, gt_ros_time)
+            return (ros_values - run_start_ros_time) / 60.0
+        return (values - float(np.nanmin(values))) / 60.0
+
+    def ros_timestamps_to_run_minutes(values: np.ndarray) -> np.ndarray:
+        values = values.astype(float)
+        if run_start_ros_time is not None:
+            return (values - run_start_ros_time) / 60.0
+        return (values - float(np.nanmin(values))) / 60.0
+
+    def set_run_x_limits(axis) -> None:
+        if run_duration_min is not None and run_duration_min > 0:
+            axis.set_xlim(0.0, run_duration_min)
+
     readme = """# Communication Plots
 
 These plots show estimated logical inter-robot SLAM communication.
 
-- X axis: minutes from the first recorded communication sample.
+- X axis: minutes from run start in ROS time when ground truth timestamps are available; otherwise minutes from the first recorded communication sample.
 - Y axis: serialized ROS message payload bandwidth in MB/s.
 - `bandwidth_over_time.png` sums measured communication topics per recorder sample window.
 - `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution. It uses a stacked layout with total bandwidth on top and one panel per source robot below.
@@ -2326,7 +2389,6 @@ These plots show estimated logical inter-robot SLAM communication.
 
     if not communication.empty:
         communication = communication.sort_values("timestamp")
-        first_timestamp = float(communication["timestamp"].min())
         total = (
             communication.groupby("timestamp", as_index=False)["bandwidth_Bps"]
             .sum()
@@ -2343,9 +2405,9 @@ These plots show estimated logical inter-robot SLAM communication.
         )
 
         fig, axis = plt.subplots(figsize=(11, 5.5))
-        total_time_min = (
-            total["timestamp"].to_numpy(dtype=float) - first_timestamp
-        ) / 60.0
+        total_time_min = wall_timestamps_to_run_minutes(
+            total["timestamp"].to_numpy(dtype=float)
+        )
         axis.plot(
             total_time_min,
             total["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
@@ -2355,9 +2417,9 @@ These plots show estimated logical inter-robot SLAM communication.
         )
         for topic in top_topics:
             topic_group = topic_series[topic_series["topic"] == topic]
-            topic_time_min = (
-                topic_group["timestamp"].to_numpy(dtype=float) - first_timestamp
-            ) / 60.0
+            topic_time_min = wall_timestamps_to_run_minutes(
+                topic_group["timestamp"].to_numpy(dtype=float)
+            )
             axis.plot(
                 topic_time_min,
                 topic_group["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
@@ -2365,10 +2427,11 @@ These plots show estimated logical inter-robot SLAM communication.
                 alpha=0.8,
                 label=topic,
             )
-        axis.set_xlabel("Time from first communication sample [min]")
+        axis.set_xlabel("Time from run start [min, ROS time]")
         axis.set_ylabel("Estimated logical bandwidth [MB/s]")
         axis.grid(True, alpha=0.25)
         axis.legend(loc="best", fontsize="small")
+        set_run_x_limits(axis)
         axis.set_title("Estimated logical inter-robot SLAM communication")
         fig.tight_layout()
         fig.savefig(plot_dir / "bandwidth_over_time.png", dpi=160)
@@ -2404,9 +2467,10 @@ These plots show estimated logical inter-robot SLAM communication.
                     .sort_values("timestamp")
                 )
                 total_time_min = (
-                    total_by_source["timestamp"].to_numpy(dtype=float)
-                    - first_timestamp
-                ) / 60.0
+                    wall_timestamps_to_run_minutes(
+                        total_by_source["timestamp"].to_numpy(dtype=float)
+                    )
+                )
                 axes[0].plot(
                     total_time_min,
                     total_by_source["bandwidth_Bps"].to_numpy(dtype=float)
@@ -2428,10 +2492,9 @@ These plots show estimated logical inter-robot SLAM communication.
                     robot_group = robot_series[
                         robot_series["source_robot"].astype(str) == robot
                     ]
-                    robot_time_min = (
+                    robot_time_min = wall_timestamps_to_run_minutes(
                         robot_group["timestamp"].to_numpy(dtype=float)
-                        - first_timestamp
-                    ) / 60.0
+                    )
                     axis.plot(
                         robot_time_min,
                         robot_group["bandwidth_Bps"].to_numpy(dtype=float)
@@ -2444,7 +2507,8 @@ These plots show estimated logical inter-robot SLAM communication.
                     axis.set_ylabel(f"{robot}\n[MB/s]")
                     axis.grid(True, alpha=0.25)
                     axis.legend(loc="upper right", fontsize="small")
-                axes[-1].set_xlabel("Time from first communication sample [min]")
+                axes[-1].set_xlabel("Time from run start [min, ROS time]")
+                set_run_x_limits(axes[-1])
                 fig.suptitle("Estimated communication bandwidth by source robot")
                 fig.tight_layout()
                 fig.savefig(plot_dir / "bandwidth_by_source_robot.png", dpi=160)
@@ -2483,8 +2547,7 @@ These plots show estimated logical inter-robot SLAM communication.
     ):
         bucket_sec = 1.0
         services = services.sort_values("timestamp_sec").copy()
-        first_service_time = float(services["timestamp_sec"].min())
-        min_bucket = math.floor(first_service_time / bucket_sec) * bucket_sec
+        min_bucket = math.floor(float(services["timestamp_sec"].min()) / bucket_sec) * bucket_sec
         max_bucket = math.ceil(float(services["timestamp_sec"].max()) / bucket_sec) * bucket_sec
         services["bucket_sec"] = (
             np.floor(services["timestamp_sec"].to_numpy(dtype=float) / bucket_sec)
@@ -2513,7 +2576,7 @@ These plots show estimated logical inter-robot SLAM communication.
         total_by_bucket = (
             services.groupby("bucket_sec")["total_bytes"].sum().reindex(buckets, fill_value=0)
         )
-        time_min = (buckets - first_service_time) / 60.0
+        time_min = ros_timestamps_to_run_minutes(buckets)
         robots = sorted(per_robot["robot"].dropna().astype(str).unique())
         fig, axes = plt.subplots(
             len(robots) + 1,
@@ -2558,7 +2621,8 @@ These plots show estimated logical inter-robot SLAM communication.
             axis.set_ylabel(f"{robot}\n[MB/s]")
             axis.grid(True, alpha=0.25)
             axis.legend(loc="upper right", fontsize="small")
-        axes[-1].set_xlabel("Time from first graph service event [min, ROS time]")
+        axes[-1].set_xlabel("Time from run start [min, ROS time]")
+        set_run_x_limits(axes[-1])
         fig.suptitle("MRG graph service communication by robot")
         fig.tight_layout()
         fig.savefig(plot_dir / "service_graph_bandwidth_by_robot.png", dpi=160)
