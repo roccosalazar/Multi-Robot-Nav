@@ -51,13 +51,17 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'enable_simulated_rendezvous',
-        default_value='false',
+        default_value='true',
         choices=['true', 'false'],
         description='Enable simulated rendezvous evaluation mode.',
     ),
     DeclareLaunchArgument(
         'rendezvous_schedule_file',
-        default_value='',
+        default_value=PathJoinSubstitution([
+            get_package_share_directory('musketeers_bringup'),
+            'config',
+            'rendezvous_test.config',
+        ]),
         description='Path to the rendezvous schedule file.',
     ),
     DeclareLaunchArgument(
