@@ -159,6 +159,14 @@ class GlobalDescriptorLoopClosureDetection(object):
             "keyframe_input_topic=cslam/keyframe_data"
         )
 
+    def remote_neighbors_in_range(self):
+        """Return remote robot IDs that are currently considered reachable."""
+        _, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range()
+        return [
+            robot_id for robot_id in neighbors_in_range_list
+            if robot_id != self.params['robot_id']
+        ]
+
     def add_global_descriptor_to_map(self, embedding, kf_id):
         """ Add global descriptor to matching list
 
@@ -213,7 +221,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         """Publish global descriptors message periodically
         Doesn't publish if the descriptors are already known by neighboring robots
         """
-        if len(self.global_descriptors_buffer) > 0:
+        remote_neighbors = self.remote_neighbors_in_range()
+        if len(self.global_descriptors_buffer) > 0 and len(remote_neighbors) > 0:
             from_kf_id = self.neighbor_manager.select_from_which_kf_to_send(
                 self.global_descriptors_buffer.peekitem(-1)[0])
 
@@ -256,7 +265,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         """Publish inter-robot matches message periodically
         Doesn't publish if the inter-robot matches are already known by neighboring robots
         """
-        if len(self.inter_robot_matches_buffer) > 0:
+        remote_neighbors = self.remote_neighbors_in_range()
+        if len(self.inter_robot_matches_buffer) > 0 and len(remote_neighbors) > 0:
             from_match_idx = self.neighbor_manager.select_from_which_match_to_send(
                 self.inter_robot_matches_buffer.peekitem(-1)[0])
 
@@ -343,9 +353,12 @@ class GlobalDescriptorLoopClosureDetection(object):
                 f"is_broker={self.neighbor_manager.local_robot_is_broker()}"
             )
         #self.node.get_logger().info('Neighbors in range: ' +  str(neighbors_in_range_list))
+        remote_neighbors = [
+            robot_id for robot_id in neighbors_in_range_list
+            if robot_id != self.params['robot_id']
+        ]
         # Check if the robot is the broker
-        if len(neighbors_in_range_list
-               ) > 0 and self.neighbor_manager.local_robot_is_broker():
+        if len(remote_neighbors) > 0 and self.neighbor_manager.local_robot_is_broker():
             if self.params["evaluation.enable_logs"]: start_time = time.time()
             # Find matches that maximize the algebraic connectivity
             selection = self.lcm.select_candidates(
