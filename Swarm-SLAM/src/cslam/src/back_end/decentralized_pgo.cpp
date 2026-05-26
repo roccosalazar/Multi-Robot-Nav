@@ -1,5 +1,6 @@
 #include "cslam/back_end/decentralized_pgo.h"
 
+#include <algorithm>
 #include <sstream>
 
 #define MAP_FRAME_ID(id) "robot" + std::to_string(id) + "_map"
@@ -80,6 +81,101 @@ std::string join_connectivity_map(const std::map<unsigned int, bool> &is_connect
   }
   oss << "}";
   return oss.str();
+}
+
+std::set<unsigned int> robot_ids_in_values(const gtsam::Values &values)
+{
+  std::set<unsigned int> robot_ids;
+  for (const auto key : values.keys())
+  {
+    robot_ids.insert(ROBOT_ID(gtsam::LabeledSymbol(key).label()));
+  }
+  return robot_ids;
+}
+
+bool has_pose_values_from_other_robots(const gtsam::Values &values,
+                                       unsigned int local_robot_id)
+{
+  for (const auto key : values.keys())
+  {
+    if (ROBOT_ID(gtsam::LabeledSymbol(key).label()) != local_robot_id)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+size_t insert_missing_pose_values(gtsam::Values::shared_ptr target,
+                                  const gtsam::Values &source)
+{
+  size_t inserted = 0;
+  for (const auto key : source.keys())
+  {
+    if (!target->exists(key))
+    {
+      target->insert(key, source.at<gtsam::Pose3>(key));
+      inserted++;
+    }
+  }
+  return inserted;
+}
+
+gtsam::Values::shared_ptr local_odometry_with_relayed_remote_values(
+    const gtsam::Values::shared_ptr &local_odometry,
+    const gtsam::Values::shared_ptr &current_estimates,
+    unsigned int local_robot_id)
+{
+  auto values = boost::make_shared<gtsam::Values>();
+  values->insert(*local_odometry);
+  for (const auto key : current_estimates->keys())
+  {
+    if (ROBOT_ID(gtsam::LabeledSymbol(key).label()) == local_robot_id ||
+        values->exists(key))
+    {
+      continue;
+    }
+    values->insert(key, current_estimates->at<gtsam::Pose3>(key));
+  }
+  return values;
+}
+
+void append_reconstructed_odometry_edges(
+    const gtsam::Values &values,
+    unsigned int local_robot_id,
+    const gtsam::SharedNoiseModel &noise_model,
+    const gtsam::NonlinearFactorGraph::shared_ptr &graph)
+{
+  std::map<unsigned int, std::vector<gtsam::Key>> keys_by_robot;
+  for (const auto key : values.keys())
+  {
+    const auto symbol = gtsam::LabeledSymbol(key);
+    const unsigned int robot_id = ROBOT_ID(symbol.label());
+    if (robot_id != local_robot_id)
+    {
+      keys_by_robot[robot_id].push_back(key);
+    }
+  }
+
+  for (auto &entry : keys_by_robot)
+  {
+    auto &keys = entry.second;
+    std::sort(keys.begin(), keys.end(), [](gtsam::Key lhs, gtsam::Key rhs) {
+      return gtsam::LabeledSymbol(lhs).index() <
+             gtsam::LabeledSymbol(rhs).index();
+    });
+
+    for (size_t i = 1; i < keys.size(); i++)
+    {
+      const auto previous_key = keys[i - 1];
+      const auto current_key = keys[i];
+      const auto previous_pose = values.at<gtsam::Pose3>(previous_key);
+      const auto current_pose = values.at<gtsam::Pose3>(current_key);
+      graph->push_back(gtsam::BetweenFactor<gtsam::Pose3>(
+          previous_key, current_key, previous_pose.between(current_pose),
+          noise_model));
+    }
+  }
 }
 } // namespace
 
@@ -549,30 +645,55 @@ cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(){
 }
 
 cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(const cslam_common_interfaces::msg::RobotIds& msg){
+  (void)msg;
   cslam_common_interfaces::msg::PoseGraph out_msg;
   out_msg.robot_id = robot_id_;
-  out_msg.values = gtsam_values_to_msg(odometry_pose_estimates_);
+  out_msg.origin_robot_id = origin_robot_id_;
+
+  const bool has_merged_estimates = has_pose_values_from_other_robots(
+      *current_pose_estimates_, robot_id_);
+  auto values_to_send =
+      has_merged_estimates
+          ? local_odometry_with_relayed_remote_values(
+                odometry_pose_estimates_, current_pose_estimates_, robot_id_)
+          : odometry_pose_estimates_;
+  out_msg.values = gtsam_values_to_msg(values_to_send);
+
   auto graph = boost::make_shared<gtsam::NonlinearFactorGraph>();
   graph->push_back(pose_graph_->begin(), pose_graph_->end());
-
-  std::set<unsigned int> connected_robots;
-
-  for (unsigned int i = 0; i < msg.ids.size(); i++)
+  if (has_merged_estimates)
   {
-    for (unsigned int j = i + 1; j < msg.ids.size(); j++)
+    append_reconstructed_odometry_edges(
+        *values_to_send, robot_id_, default_noise_model_, graph);
+  }
+
+  std::set<unsigned int> connected_robots(connected_robots_.begin(),
+                                          connected_robots_.end());
+  std::set<std::pair<gtsam::Key, gtsam::Key>> added_loop_closures;
+  std::set<unsigned int> value_robot_ids = robot_ids_in_values(*values_to_send);
+
+  for (auto robot0_id : value_robot_ids)
+  {
+    for (auto robot1_id : value_robot_ids)
     {
-      unsigned int min_robot_id = std::min(msg.ids[i], msg.ids[j]);
-      unsigned int max_robot_id = std::max(msg.ids[i], msg.ids[j]);
-      if (inter_robot_loop_closures_[{min_robot_id, max_robot_id}].size() > 0 &&
-          (min_robot_id == robot_id_ || max_robot_id == robot_id_))
+      if (robot0_id >= robot1_id)
       {
-        connected_robots.insert(min_robot_id);
-        connected_robots.insert(max_robot_id);
-        if (min_robot_id == robot_id_)
+        continue;
+      }
+
+      unsigned int min_robot_id = std::min(robot0_id, robot1_id);
+      unsigned int max_robot_id = std::max(robot0_id, robot1_id);
+      for (const auto &factor :
+           inter_robot_loop_closures_[{min_robot_id, max_robot_id}])
+      {
+        if (values_to_send->exists(factor.key1()) &&
+            values_to_send->exists(factor.key2()) &&
+            added_loop_closures.count({factor.key1(), factor.key2()}) == 0)
         {
-          graph->push_back(
-              inter_robot_loop_closures_[{min_robot_id, max_robot_id}].begin(),
-              inter_robot_loop_closures_[{min_robot_id, max_robot_id}].end());
+          connected_robots.insert(min_robot_id);
+          connected_robots.insert(max_robot_id);
+          graph->push_back(factor);
+          added_loop_closures.insert({factor.key1(), factor.key2()});
         }
       }
     }
@@ -624,12 +745,11 @@ void DecentralizedPGO::pose_graph_callback(
   }
   if (optimizer_state_ == OptimizerState::WAITING_FOR_NEIGHBORS_POSEGRAPHS)
   {
-    other_robots_graph_and_estimates_.insert(
-        {msg->robot_id,
-         {edges_msg_to_gtsam(msg->edges), values_msg_to_gtsam(msg->values)}});
+    other_robots_graph_and_estimates_[msg->robot_id] =
+        {edges_msg_to_gtsam(msg->edges), values_msg_to_gtsam(msg->values)};
     received_pose_graphs_[msg->robot_id] = true;
-    received_pose_graphs_connectivity_.insert(
-        {msg->robot_id, msg->connected_robots.ids});
+    received_pose_graphs_connectivity_[msg->robot_id] =
+        msg->connected_robots.ids;
 
     RCLCPP_INFO(
         node_->get_logger(),
@@ -654,11 +774,24 @@ void DecentralizedPGO::pose_graph_callback(
 
 std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
 {
-  if (connected_robots_.size() > 0)
+  std::map<unsigned int, std::set<unsigned int>> connectivity_graph;
+  auto add_connectivity_edge = [&connectivity_graph](unsigned int a,
+                                                     unsigned int b) {
+    connectivity_graph[a].insert(b);
+    connectivity_graph[b].insert(a);
+  };
+
+  for (auto id : connected_robots_)
   {
-    std::vector<unsigned int> v(connected_robots_.begin(),
-                                connected_robots_.end());
-    received_pose_graphs_connectivity_.insert({robot_id_, v});
+    add_connectivity_edge(robot_id_, id);
+  }
+
+  for (const auto &entry : received_pose_graphs_connectivity_)
+  {
+    for (auto id : entry.second)
+    {
+      add_connectivity_edge(entry.first, id);
+    }
   }
 
   std::map<unsigned int, bool> is_robot_connected;
@@ -668,14 +801,17 @@ std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
     is_robot_connected.insert({id, false});
   }
 
-  // Breadth First Search
-  std::map<unsigned int, bool> visited;
-  visited[robot_id_] = false;
-  for (auto id : current_neighbors_ids_.robots.ids)
+  for (const auto &entry : connectivity_graph)
   {
-    visited[id] = false;
+    is_robot_connected.insert({entry.first, false});
+    for (auto id : entry.second)
+    {
+      is_robot_connected.insert({id, false});
+    }
   }
 
+  // Breadth First Search
+  std::map<unsigned int, bool> visited;
   std::list<unsigned int> queue;
 
   unsigned int current_id = robot_id_;
@@ -687,11 +823,11 @@ std::map<unsigned int, bool> DecentralizedPGO::connected_robot_pose_graph()
     current_id = queue.front();
     queue.pop_front();
 
-    for (auto id : received_pose_graphs_connectivity_[current_id])
+    for (auto id : connectivity_graph[current_id])
     {
       is_robot_connected[id] = true;
 
-      if (!visited[id])
+      if (visited.count(id) == 0 || !visited[id])
       {
         visited[id] = true;
         queue.push_back(id);
@@ -775,7 +911,19 @@ DecentralizedPGO::aggregate_pose_graphs()
   auto estimates = boost::make_shared<gtsam::Values>();
   // Local graph
   graph->push_back(pose_graph_->begin(), pose_graph_->end());
-  estimates->insert(*odometry_pose_estimates_);
+  const bool has_merged_estimates = has_pose_values_from_other_robots(
+      *current_pose_estimates_, robot_id_);
+  auto local_values =
+      has_merged_estimates
+          ? local_odometry_with_relayed_remote_values(
+                odometry_pose_estimates_, current_pose_estimates_, robot_id_)
+          : odometry_pose_estimates_;
+  estimates->insert(*local_values);
+  if (has_merged_estimates)
+  {
+    append_reconstructed_odometry_edges(
+        *local_values, robot_id_, default_noise_model_, graph);
+  }
   tentative_local_pose_at_latest_optimization_ = latest_local_pose_;
   tentative_local_symbol_at_latest_optimization_ = latest_local_symbol_;
   size_t inserted_remote_values = 0;
@@ -787,29 +935,29 @@ DecentralizedPGO::aggregate_pose_graphs()
   {
     if (is_pose_graph_connected[id])
     {
-      inserted_remote_values += other_robots_graph_and_estimates_[id].second->size();
-      estimates->insert(*other_robots_graph_and_estimates_[id].second);
+      inserted_remote_values += insert_missing_pose_values(
+          estimates, *other_robots_graph_and_estimates_[id].second);
     }
   }
 
   std::set<std::pair<gtsam::Key, gtsam::Key>> added_loop_closures;
   // Add local inter-robot loop closures
-  auto included_robots_ids = current_neighbors_ids_;
-  included_robots_ids.robots.ids.push_back(robot_id_);
-  for (unsigned int i = 0; i < included_robots_ids.robots.ids.size(); i++)
+  const auto included_robot_ids = robot_ids_in_values(*estimates);
+  for (auto robot0_id : included_robot_ids)
   {
-    for (unsigned int j = i + 1; j < included_robots_ids.robots.ids.size();
-         j++)
+    for (auto robot1_id : included_robot_ids)
     {
-      if (is_pose_graph_connected[included_robots_ids.robots.ids[i]] &&
-          is_pose_graph_connected[included_robots_ids.robots.ids[j]])
+      if (robot0_id >= robot1_id)
       {
-        unsigned int min_id = std::min(included_robots_ids.robots.ids[i],
-                                       included_robots_ids.robots.ids[j]);
-        unsigned int max_id = std::max(included_robots_ids.robots.ids[i],
-                                       included_robots_ids.robots.ids[j]);
-        for (const auto &factor :
-             inter_robot_loop_closures_[{min_id, max_id}])
+        continue;
+      }
+
+      if (is_pose_graph_connected[robot0_id] &&
+          is_pose_graph_connected[robot1_id])
+      {
+        unsigned int min_id = std::min(robot0_id, robot1_id);
+        unsigned int max_id = std::max(robot0_id, robot1_id);
+        for (const auto &factor : inter_robot_loop_closures_[{min_id, max_id}])
         {
           if (estimates->exists(factor.key1()) &&
               estimates->exists(factor.key2()) &&
@@ -923,6 +1071,7 @@ void DecentralizedPGO::share_optimized_estimates(
   {
     return;
   }
+  auto is_pose_graph_connected = connected_robot_pose_graph();
   auto included_robots_ids = current_neighbors_ids_;
   included_robots_ids.robots.ids.push_back(robot_id_);
   for (unsigned int i = 0; i < included_robots_ids.robots.ids.size(); i++)
@@ -930,17 +1079,27 @@ void DecentralizedPGO::share_optimized_estimates(
     cslam_common_interfaces::msg::OptimizationResult msg;
     msg.success = true;
     msg.origin_robot_id = origin_robot_id_;
-    auto filtered_estimates =
-        estimates.filter(gtsam::LabeledSymbol::LabelTest(
-            ROBOT_LABEL(included_robots_ids.robots.ids[i])));
-    msg.estimates = gtsam_values_to_msg(filtered_estimates);
+    const unsigned int target_robot_id = included_robots_ids.robots.ids[i];
+    const bool share_full_component =
+        target_robot_id == robot_id_ || is_pose_graph_connected[target_robot_id];
+    if (share_full_component)
+    {
+      msg.estimates = gtsam_values_to_msg(estimates);
+    }
+    else
+    {
+      auto filtered_estimates =
+          estimates.filter(gtsam::LabeledSymbol::LabelTest(
+              ROBOT_LABEL(target_robot_id)));
+      msg.estimates = gtsam_values_to_msg(filtered_estimates);
+    }
     optimized_estimates_publishers_[included_robots_ids.robots.ids[i]]->publish(
         msg);
     RCLCPP_INFO(
         node_->get_logger(),
-        "[DEBUG_BACKEND_PIPELINE] share_optimized_estimates target_robot=%u origin_robot_id=%u filtered_estimates=%zu total_estimates=%zu",
-        included_robots_ids.robots.ids[i], origin_robot_id_,
-        filtered_estimates.size(), estimates.size());
+        "[DEBUG_BACKEND_PIPELINE] share_optimized_estimates target_robot=%u origin_robot_id=%u shared_estimates=%zu total_estimates=%zu full_component=%s",
+        target_robot_id, origin_robot_id_, msg.estimates.size(),
+        estimates.size(), share_full_component ? "true" : "false");
   }
 }
 
