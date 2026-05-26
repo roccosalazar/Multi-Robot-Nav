@@ -50,4 +50,4 @@ class NeighborMonitor():
             now = time()
             return self.first_heartbeat_received and now - self.init_time > self.init_delay_sec and now - self.latest_time_stamp < self.max_delay_sec
         else:
-            True
+            return True

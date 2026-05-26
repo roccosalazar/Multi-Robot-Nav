@@ -278,7 +278,7 @@ class GlobalDescriptorLoopClosureDetection(object):
 
     def inter_robot_matches_timer_callback(self):
         """Publish inter-robot matches message periodically
-        Doesn't publish if the inter-robot matches are already known by neighboring robots
+        Publish only while in rendezvous so sparse candidate matches can reach the broker.
         """
         if not self.local_robot_is_in_rendezvous():
             return
@@ -292,16 +292,16 @@ class GlobalDescriptorLoopClosureDetection(object):
                 self.inter_robot_matches_buffer.peekitem(0)[0], self.
                 params['frontend.detection_publication_max_elems_per_msg'])
 
-            # Don't transmit matches that should have already been detected by the other robot
+            # The broker already has locally generated direct-pair matches.
+            # Non-brokers must still forward theirs so the broker can select them.
             _, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range()
-            if len(neighbors_in_range_list) == 2:
-                self.node.get_logger().info("Transmitting matches {}".format(neighbors_in_range_list))
-                for c in chuncks:
-                    for match in c:
-                        if match.robot0_id in neighbors_in_range_list and match.robot1_id in neighbors_in_range_list:
-                            c.remove(match)
-                    if len(c) <= 0:
-                        chuncks.remove(c)
+            if len(neighbors_in_range_list) == 2 and self.neighbor_manager.local_robot_is_broker():
+                neighbor_set = set(neighbors_in_range_list)
+                chuncks = [[
+                    match for match in c
+                    if not (match.robot0_id in neighbor_set and match.robot1_id in neighbor_set)
+                ] for c in chuncks]
+                chuncks = [c for c in chuncks if len(c) > 0]
 
             # Convert to ROS message
             msgs = []
@@ -312,7 +312,7 @@ class GlobalDescriptorLoopClosureDetection(object):
                     m.append(msg)
                 msgs.append(m)
 
-            # Transmit the rest
+            # Transmit matches
             for m in msgs:
                 inter_robot_matches = InterRobotMatches()
                 inter_robot_matches.robot_id = self.params['robot_id']
