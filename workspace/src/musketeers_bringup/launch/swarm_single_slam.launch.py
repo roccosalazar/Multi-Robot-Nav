@@ -54,6 +54,12 @@ ARGUMENTS = [
         description='Enable simulated rendezvous evaluation mode.',
     ),
     DeclareLaunchArgument(
+        'enable_frontend_simulated_rendezvous',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Also gate frontend descriptor and loop-closure communication by rendezvous.',
+    ),
+    DeclareLaunchArgument(
         'rendezvous_schedule_file',
         default_value='',
         description='Path to the rendezvous schedule file.',
@@ -317,6 +323,10 @@ def _create_cslam_nodes(context: LaunchContext) -> list[Node]:
         'evaluation.enable_simulated_rendezvous': _get_launch_bool(
             context,
             'enable_simulated_rendezvous',
+        ),
+        'evaluation.enable_frontend_simulated_rendezvous': _get_launch_bool(
+            context,
+            'enable_frontend_simulated_rendezvous',
         ),
         'evaluation.rendezvous_schedule_file': _get_launch_value(
             context,

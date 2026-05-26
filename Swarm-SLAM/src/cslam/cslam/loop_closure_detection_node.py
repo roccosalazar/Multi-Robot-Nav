@@ -44,6 +44,7 @@ class LoopClosureDetection(Node):
                         ('evaluation.enable_logs', False),
                         ('evaluation.enable_sparsification_comparison', False),
                         ('evaluation.enable_simulated_rendezvous', False),
+                        ('evaluation.enable_frontend_simulated_rendezvous', False),
                         ('evaluation.rendezvous_schedule_file', ''),
                         ])
         self.params = {}
@@ -97,6 +98,8 @@ class LoopClosureDetection(Node):
             'evaluation.enable_sparsification_comparison').value
         self.params["evaluation.enable_simulated_rendezvous"] = self.get_parameter(
             'evaluation.enable_simulated_rendezvous').value
+        self.params["evaluation.enable_frontend_simulated_rendezvous"] = self.get_parameter(
+            'evaluation.enable_frontend_simulated_rendezvous').value
         self.params["evaluation.rendezvous_schedule_file"] = self.get_parameter(
             'evaluation.rendezvous_schedule_file').value
 
@@ -111,7 +114,8 @@ class LoopClosureDetection(Node):
             f"inter_robot_budget={self.params['frontend.inter_robot_loop_closure_budget']} "
             f"descriptor_topic={self.get_parameter('frontend.global_descriptors_topic').value} "
             f"inter_robot_matches_topic={self.get_parameter('frontend.inter_robot_matches_topic').value} "
-            f"enable_simulated_rendezvous={self.params['evaluation.enable_simulated_rendezvous']}"
+            f"enable_simulated_rendezvous={self.params['evaluation.enable_simulated_rendezvous']} "
+            f"enable_frontend_simulated_rendezvous={self.params['evaluation.enable_frontend_simulated_rendezvous']}"
         )
 
         self.glcd = GlobalDescriptorLoopClosureDetection(

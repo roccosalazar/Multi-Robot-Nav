@@ -29,7 +29,7 @@ class LidarHandler:
         self.last_sync_abs_dt = None
         self.rendezvous_gate = SimulatedRendezvous(
             self.node,
-            self.params.get("evaluation.enable_simulated_rendezvous", False),
+            self.params.get("evaluation.enable_frontend_simulated_rendezvous", False),
             self.params.get("evaluation.rendezvous_schedule_file", ""),
             self.params["robot_id"],
         )
@@ -357,6 +357,7 @@ if __name__ == '__main__':
                         ('evaluation.gps_topic', ""),            
                         ('evaluation.gps_topic', ""),        
                         ('evaluation.enable_simulated_rendezvous', False),
+                        ('evaluation.enable_frontend_simulated_rendezvous', False),
                         ('evaluation.rendezvous_schedule_file', ''),
                         ('visualization.enable', False),
                         ])
@@ -389,6 +390,8 @@ if __name__ == '__main__':
             'evaluation.gps_topic').value
     params["evaluation.enable_simulated_rendezvous"] = node.get_parameter(
             'evaluation.enable_simulated_rendezvous').value
+    params["evaluation.enable_frontend_simulated_rendezvous"] = node.get_parameter(
+            'evaluation.enable_frontend_simulated_rendezvous').value
     params["evaluation.rendezvous_schedule_file"] = node.get_parameter(
             'evaluation.rendezvous_schedule_file').value
     params["visualization.enable"] = node.get_parameter(

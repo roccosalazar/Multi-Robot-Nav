@@ -116,7 +116,7 @@ class GlobalDescriptorLoopClosureDetection(object):
             self.node, self.params)
         self.rendezvous_gate = SimulatedRendezvous(
             self.node,
-            self.params.get('evaluation.enable_simulated_rendezvous', False),
+            self.params.get('evaluation.enable_frontend_simulated_rendezvous', False),
             self.params.get('evaluation.rendezvous_schedule_file', ''),
             self.params['robot_id'],
         )

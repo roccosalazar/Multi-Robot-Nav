@@ -56,6 +56,12 @@ ARGUMENTS = [
         description='Enable simulated rendezvous evaluation mode.',
     ),
     DeclareLaunchArgument(
+        'enable_frontend_simulated_rendezvous',
+        default_value='false',
+        choices=['true', 'false'],
+        description='Also gate frontend descriptor and loop-closure communication by rendezvous.',
+    ),
+    DeclareLaunchArgument(
         'rendezvous_schedule_file',
         default_value=PathJoinSubstitution([
             get_package_share_directory('musketeers_bringup'),
@@ -236,6 +242,7 @@ def _create_swarm_single_slam_instance(
                     'lidar_odometry_config': LaunchConfiguration('lidar_odometry_config'),
                     'launch_prefix_cslam': LaunchConfiguration('launch_prefix_cslam'),
                     'enable_simulated_rendezvous': LaunchConfiguration('enable_simulated_rendezvous'),
+                    'enable_frontend_simulated_rendezvous': LaunchConfiguration('enable_frontend_simulated_rendezvous'),
                     'rendezvous_schedule_file': LaunchConfiguration('rendezvous_schedule_file'),
                     'log_level': LaunchConfiguration('log_level'),
                     'start_graph_viewer': start_graph_viewer,
