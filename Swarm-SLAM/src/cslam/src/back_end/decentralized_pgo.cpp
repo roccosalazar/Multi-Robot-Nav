@@ -618,7 +618,9 @@ void DecentralizedPGO::intra_robot_loop_closure_callback(
       }
     }
 
-    gtsam::Pose3 measurement = transform_msg_to_pose3(msg->transform);
+    // Registration returns the transform from the matched frame back to the
+    // query frame. GTSAM BetweenFactor(from, to) expects from.between(to).
+    gtsam::Pose3 measurement = transform_msg_to_pose3(msg->transform).inverse();
 
     gtsam::LabeledSymbol symbol_from(GRAPH_LABEL, ROBOT_LABEL(robot_id_),
                                      msg->keyframe0_id);
@@ -642,7 +644,9 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
 {
   if (msg->success)
   {
-    gtsam::Pose3 measurement = transform_msg_to_pose3(msg->transform);
+    // Registration returns the transform from the matched frame back to the
+    // query frame. GTSAM BetweenFactor(from, to) expects from.between(to).
+    gtsam::Pose3 measurement = transform_msg_to_pose3(msg->transform).inverse();
 
     unsigned char robot0_c = ROBOT_LABEL(msg->robot0_id);
     gtsam::LabeledSymbol symbol_from(GRAPH_LABEL, robot0_c,
