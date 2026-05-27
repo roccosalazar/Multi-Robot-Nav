@@ -57,7 +57,7 @@ ARGUMENTS = [
     ),
     DeclareLaunchArgument(
         'enable_frontend_simulated_rendezvous',
-        default_value='false',
+        default_value='true',
         choices=['true', 'false'],
         description='Also gate frontend descriptor and loop-closure communication by rendezvous.',
     ),

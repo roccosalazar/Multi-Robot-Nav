@@ -20,7 +20,7 @@ import math
 from pathlib import Path
 import re
 import sys
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -2226,7 +2226,14 @@ def load_communication_timeseries(run_dir: Path) -> pd.DataFrame:
             file=sys.stderr,
         )
         return pd.DataFrame()
-    for column in ["timestamp", "messages", "bytes", "bandwidth_Bps"]:
+    for column in [
+        "timestamp",
+        "window_start",
+        "window_end",
+        "messages",
+        "bytes",
+        "bandwidth_Bps",
+    ]:
         if column in df.columns:
             df[column] = pd.to_numeric(df[column], errors="coerce")
     for column in ["traffic_class", "source_robot", "peer_robot"]:
@@ -2372,12 +2379,77 @@ def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
         if run_duration_min is not None and run_duration_min > 0:
             axis.set_xlim(0.0, run_duration_min)
 
+    def aggregate_bandwidth_windows(
+        df: pd.DataFrame,
+        extra_columns: Sequence[str] = (),
+    ) -> pd.DataFrame:
+        window_columns = [
+            column
+            for column in ["window_start", "window_end"]
+            if column in df.columns
+        ]
+        if len(window_columns) == 2:
+            group_columns = [*window_columns, *extra_columns]
+            return (
+                df.groupby(group_columns, as_index=False)["bandwidth_Bps"]
+                .sum()
+                .sort_values("window_end")
+            )
+        group_columns = ["timestamp", *extra_columns]
+        return (
+            df.groupby(group_columns, as_index=False)["bandwidth_Bps"]
+            .sum()
+            .sort_values("timestamp")
+        )
+
+    def plot_bandwidth_windows(
+        axis,
+        df: pd.DataFrame,
+        *,
+        label: str,
+        linewidth: float,
+        color=None,
+        alpha: float = 1.0,
+    ) -> None:
+        if df.empty:
+            return
+        y = df["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0
+        if {"window_start", "window_end"}.issubset(df.columns):
+            starts = wall_timestamps_to_run_minutes(
+                df["window_start"].to_numpy(dtype=float)
+            )
+            ends = wall_timestamps_to_run_minutes(
+                df["window_end"].to_numpy(dtype=float)
+            )
+            finite = np.isfinite(starts) & np.isfinite(ends) & np.isfinite(y)
+            if np.any(finite):
+                axis.hlines(
+                    y[finite],
+                    starts[finite],
+                    ends[finite],
+                    linewidth=linewidth,
+                    color=color,
+                    alpha=alpha,
+                    label=label,
+                )
+            return
+        time_min = wall_timestamps_to_run_minutes(df["timestamp"].to_numpy(dtype=float))
+        axis.plot(
+            time_min,
+            y,
+            linewidth=linewidth,
+            color=color,
+            alpha=alpha,
+            label=label,
+        )
+
     readme = """# Communication Plots
 
 These plots show estimated logical inter-robot SLAM communication.
 
 - X axis: minutes from run start in ROS time when ground truth timestamps are available; otherwise minutes from the first recorded communication sample.
 - Y axis: serialized ROS message payload bandwidth in MB/s.
+- Bandwidth time series are drawn as horizontal segments over each recorder sample window, so gaps without recorded messages are not visually connected.
 - `bandwidth_over_time.png` sums measured communication topics per recorder sample window.
 - `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution. It uses a stacked layout with total bandwidth on top and one panel per source robot below.
 - `total_mb_by_source_robot.png` appears when robot-level communication totals are available.
@@ -2389,43 +2461,29 @@ These plots show estimated logical inter-robot SLAM communication.
 
     if not communication.empty:
         communication = communication.sort_values("timestamp")
-        total = (
-            communication.groupby("timestamp", as_index=False)["bandwidth_Bps"]
-            .sum()
-            .sort_values("timestamp")
-        )
+        total = aggregate_bandwidth_windows(communication)
         topic_totals = (
             communication.groupby("topic")["bytes"].sum().sort_values(ascending=False)
         )
         top_topics = list(topic_totals.head(5).index)
-        topic_series = (
-            communication.groupby(["timestamp", "topic"], as_index=False)["bandwidth_Bps"]
-            .sum()
-            .sort_values("timestamp")
-        )
+        topic_series = aggregate_bandwidth_windows(communication, ["topic"])
 
         fig, axis = plt.subplots(figsize=(11, 5.5))
-        total_time_min = wall_timestamps_to_run_minutes(
-            total["timestamp"].to_numpy(dtype=float)
-        )
-        axis.plot(
-            total_time_min,
-            total["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+        plot_bandwidth_windows(
+            axis,
+            total,
             label="Total",
             linewidth=2.2,
             color="black",
         )
         for topic in top_topics:
             topic_group = topic_series[topic_series["topic"] == topic]
-            topic_time_min = wall_timestamps_to_run_minutes(
-                topic_group["timestamp"].to_numpy(dtype=float)
-            )
-            axis.plot(
-                topic_time_min,
-                topic_group["bandwidth_Bps"].to_numpy(dtype=float) / 1_000_000.0,
+            plot_bandwidth_windows(
+                axis,
+                topic_group,
+                label=topic,
                 linewidth=1.3,
                 alpha=0.8,
-                label=topic,
             )
         axis.set_xlabel("Time from run start [min, ROS time]")
         axis.set_ylabel("Estimated logical bandwidth [MB/s]")
@@ -2444,13 +2502,9 @@ These plots show estimated logical inter-robot SLAM communication.
                 )
             ].copy()
             if not known_sources.empty:
-                robot_series = (
-                    known_sources.groupby(
-                        ["timestamp", "source_robot"],
-                        as_index=False,
-                    )["bandwidth_Bps"]
-                    .sum()
-                    .sort_values("timestamp")
+                robot_series = aggregate_bandwidth_windows(
+                    known_sources,
+                    ["source_robot"],
                 )
                 robots = sorted(robot_series["source_robot"].astype(str).unique())
                 fig, axes = plt.subplots(
@@ -2461,20 +2515,10 @@ These plots show estimated logical inter-robot SLAM communication.
                 )
                 axes = np.atleast_1d(axes)
 
-                total_by_source = (
-                    robot_series.groupby("timestamp", as_index=False)["bandwidth_Bps"]
-                    .sum()
-                    .sort_values("timestamp")
-                )
-                total_time_min = (
-                    wall_timestamps_to_run_minutes(
-                        total_by_source["timestamp"].to_numpy(dtype=float)
-                    )
-                )
-                axes[0].plot(
-                    total_time_min,
-                    total_by_source["bandwidth_Bps"].to_numpy(dtype=float)
-                    / 1_000_000.0,
+                total_by_source = aggregate_bandwidth_windows(robot_series)
+                plot_bandwidth_windows(
+                    axes[0],
+                    total_by_source,
                     linewidth=2.2,
                     color="black",
                     label="Total source robots",
@@ -2492,13 +2536,9 @@ These plots show estimated logical inter-robot SLAM communication.
                     robot_group = robot_series[
                         robot_series["source_robot"].astype(str) == robot
                     ]
-                    robot_time_min = wall_timestamps_to_run_minutes(
-                        robot_group["timestamp"].to_numpy(dtype=float)
-                    )
-                    axis.plot(
-                        robot_time_min,
-                        robot_group["bandwidth_Bps"].to_numpy(dtype=float)
-                        / 1_000_000.0,
+                    plot_bandwidth_windows(
+                        axis,
+                        robot_group,
                         linewidth=1.5,
                         alpha=0.9,
                         color=robot_colors[robot],
