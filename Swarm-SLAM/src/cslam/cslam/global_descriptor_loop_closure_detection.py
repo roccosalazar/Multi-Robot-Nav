@@ -243,7 +243,7 @@ class GlobalDescriptorLoopClosureDetection(object):
 
             msgs = dict_to_list_chunks(
                 self.global_descriptors_buffer,
-                from_kf_id - self.global_descriptors_buffer.peekitem(0)[0],
+                from_kf_id,
                 self.params['frontend.detection_publication_max_elems_per_msg']
             )
 
@@ -288,9 +288,8 @@ class GlobalDescriptorLoopClosureDetection(object):
                 self.inter_robot_matches_buffer.peekitem(-1)[0])
 
             chuncks = dict_to_list_chunks(
-                self.inter_robot_matches_buffer, from_match_idx -
-                self.inter_robot_matches_buffer.peekitem(0)[0], self.
-                params['frontend.detection_publication_max_elems_per_msg'])
+                self.inter_robot_matches_buffer, from_match_idx,
+                self.params['frontend.detection_publication_max_elems_per_msg'])
 
             # The broker already has locally generated direct-pair matches.
             # Non-brokers must still forward theirs so the broker can select them.
