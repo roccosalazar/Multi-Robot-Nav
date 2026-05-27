@@ -63,45 +63,48 @@ class NeighborManager():
                     is_broker = False
         return is_broker
 
-    def select_from_which_kf_to_send(self, latest_local_id):
+    def _active_neighbor_ids(self, active_neighbor_ids=None):
+        if active_neighbor_ids is not None:
+            return [
+                rid for rid in active_neighbor_ids
+                if rid != self.robot_id and rid in self.neighbors_monitors
+            ]
+        return [
+            rid for rid, monitor in self.neighbors_monitors.items()
+            if monitor.is_alive()
+        ]
+
+    def select_from_which_kf_to_send(self, latest_local_id, active_neighbor_ids=None):
         """This function finds the range of descriptors to send
         so that we do not loose info
         """
 
         from_kf_id = latest_local_id
-        for i in range(self.max_nb_robots):
-            if i != self.robot_id:
-                if self.neighbors_monitors[i].is_alive():
-                    from_kf_id = min(
-                        self.neighbors_monitors[i].last_keyframe_sent,
-                        from_kf_id)
+        for i in self._active_neighbor_ids(active_neighbor_ids):
+            from_kf_id = min(
+                self.neighbors_monitors[i].last_keyframe_sent,
+                from_kf_id)
 
-        for i in range(self.max_nb_robots):
-            if i != self.robot_id:
-                if self.neighbors_monitors[i].is_alive():
-                    self.neighbors_monitors[
-                        i].last_keyframe_sent = latest_local_id
+        for i in self._active_neighbor_ids(active_neighbor_ids):
+            self.neighbors_monitors[
+                i].last_keyframe_sent = latest_local_id
 
         return from_kf_id + 1
 
-    def select_from_which_match_to_send(self, latest_local_match_idx):
+    def select_from_which_match_to_send(self, latest_local_match_idx, active_neighbor_ids=None):
         """This function finds the range of matches to send
         so that we do not loose info
         """
 
         from_match_id = latest_local_match_idx
-        for i in range(self.max_nb_robots):
-            if i != self.robot_id:
-                if self.neighbors_monitors[i].is_alive():
-                    from_match_id = min(
-                        self.neighbors_monitors[i].last_match_sent,
-                        from_match_id)
+        for i in self._active_neighbor_ids(active_neighbor_ids):
+            from_match_id = min(
+                self.neighbors_monitors[i].last_match_sent,
+                from_match_id)
 
-        for i in range(self.max_nb_robots):
-            if i != self.robot_id:
-                if self.neighbors_monitors[i].is_alive():
-                    self.neighbors_monitors[
-                        i].last_match_sent = latest_local_match_idx
+        for i in self._active_neighbor_ids(active_neighbor_ids):
+            self.neighbors_monitors[
+                i].last_match_sent = latest_local_match_idx
 
         return from_match_id + 1
 

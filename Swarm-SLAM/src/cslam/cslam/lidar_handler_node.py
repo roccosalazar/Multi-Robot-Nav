@@ -171,12 +171,22 @@ class LidarHandler:
         """
         if not self.rendezvous_gate.is_alive():
             return
+        alive_match_indices = [
+            idx for idx, robot_id in enumerate(request.matches_robot_id)
+            if self.rendezvous_gate.is_robot_alive(robot_id)
+        ]
+        if len(alive_match_indices) == 0:
+            return
         out_msg = LocalPointCloudDescriptors()
         out_msg.data = icp_utils.open3d_to_ros(self.local_descriptors_map[request.keyframe_id])
         out_msg.keyframe_id = request.keyframe_id
         out_msg.robot_id = self.params["robot_id"]
-        out_msg.matches_robot_id = request.matches_robot_id
-        out_msg.matches_keyframe_id = request.matches_keyframe_id
+        out_msg.matches_robot_id = [
+            request.matches_robot_id[idx] for idx in alive_match_indices
+        ]
+        out_msg.matches_keyframe_id = [
+            request.matches_keyframe_id[idx] for idx in alive_match_indices
+        ]
 
         self.pointcloud_descriptors_publisher.publish(out_msg)
         if self.params["evaluation.enable_logs"]:
@@ -187,6 +197,8 @@ class LidarHandler:
         """Callback for local descriptors from other robots
         """
         if not self.rendezvous_gate.is_alive():
+            return
+        if not self.rendezvous_gate.is_robot_alive(msg.robot_id):
             return
         frame_ids = []
         for i in range(len(msg.matches_robot_id)):

@@ -168,17 +168,36 @@ class GlobalDescriptorLoopClosureDetection(object):
 
     def remote_neighbors_in_range(self):
         """Return remote robot IDs that are currently considered reachable."""
-        if not self.local_robot_is_in_rendezvous():
-            return []
-        _, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range()
+        _, neighbors_in_range_list = self.neighbors_in_range()
         return [
             robot_id for robot_id in neighbors_in_range_list
             if robot_id != self.params['robot_id']
         ]
 
+    def neighbors_in_range(self):
+        """Return reachability using the rendezvous schedule when enabled."""
+        if self.rendezvous_gate.enabled:
+            neighbors_in_range_list = self.rendezvous_gate.robots_alive(
+                self.params['max_nb_robots'])
+            neighbors_is_in_range = {
+                robot_id: robot_id in neighbors_in_range_list
+                for robot_id in range(self.params['max_nb_robots'])
+            }
+            return neighbors_is_in_range, neighbors_in_range_list
+        return self.neighbor_manager.check_neighbors_in_range()
+
     def local_robot_is_in_rendezvous(self):
         """Return whether this robot is allowed to exchange CSLAM data now."""
         return self.rendezvous_gate.is_alive()
+
+    def local_robot_is_broker(self, neighbors_in_range_list):
+        """Return whether the local robot is broker for the current rendezvous."""
+        if self.rendezvous_gate.enabled:
+            return (
+                self.params['robot_id'] in neighbors_in_range_list and
+                self.params['robot_id'] == min(neighbors_in_range_list)
+            )
+        return self.neighbor_manager.local_robot_is_broker()
 
     def add_global_descriptor_to_map(self, embedding, kf_id):
         """ Add global descriptor to matching list
@@ -239,7 +258,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         remote_neighbors = self.remote_neighbors_in_range()
         if len(self.global_descriptors_buffer) > 0 and len(remote_neighbors) > 0:
             from_kf_id = self.neighbor_manager.select_from_which_kf_to_send(
-                self.global_descriptors_buffer.peekitem(-1)[0])
+                self.global_descriptors_buffer.peekitem(-1)[0],
+                remote_neighbors)
 
             msgs = dict_to_list_chunks(
                 self.global_descriptors_buffer,
@@ -285,7 +305,8 @@ class GlobalDescriptorLoopClosureDetection(object):
         remote_neighbors = self.remote_neighbors_in_range()
         if len(self.inter_robot_matches_buffer) > 0 and len(remote_neighbors) > 0:
             from_match_idx = self.neighbor_manager.select_from_which_match_to_send(
-                self.inter_robot_matches_buffer.peekitem(-1)[0])
+                self.inter_robot_matches_buffer.peekitem(-1)[0],
+                remote_neighbors)
 
             chuncks = dict_to_list_chunks(
                 self.inter_robot_matches_buffer, from_match_idx,
@@ -293,8 +314,8 @@ class GlobalDescriptorLoopClosureDetection(object):
 
             # The broker already has locally generated direct-pair matches.
             # Non-brokers must still forward theirs so the broker can select them.
-            _, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range()
-            if len(neighbors_in_range_list) == 2 and self.neighbor_manager.local_robot_is_broker():
+            _, neighbors_in_range_list = self.neighbors_in_range()
+            if len(neighbors_in_range_list) == 2 and self.local_robot_is_broker(neighbors_in_range_list):
                 neighbor_set = set(neighbors_in_range_list)
                 chuncks = [[
                     match for match in c
@@ -361,14 +382,13 @@ class GlobalDescriptorLoopClosureDetection(object):
         self.inter_detect_cycles += 1
         if not self.local_robot_is_in_rendezvous():
             return
-        neighbors_is_in_range, neighbors_in_range_list = self.neighbor_manager.check_neighbors_in_range(
-        )
+        neighbors_is_in_range, neighbors_in_range_list = self.neighbors_in_range()
         if self.inter_detect_cycles <= 5 or self.inter_detect_cycles % 20 == 0:
             self.node.get_logger().info(
                 "[DEBUG_LC_PIPELINE] detect_inter cycle "
                 f"count={self.inter_detect_cycles} "
                 f"neighbors={neighbors_in_range_list} "
-                f"is_broker={self.neighbor_manager.local_robot_is_broker()}"
+                f"is_broker={self.local_robot_is_broker(neighbors_in_range_list)}"
             )
         #self.node.get_logger().info('Neighbors in range: ' +  str(neighbors_in_range_list))
         remote_neighbors = [
@@ -376,7 +396,7 @@ class GlobalDescriptorLoopClosureDetection(object):
             if robot_id != self.params['robot_id']
         ]
         # Check if the robot is the broker
-        if len(remote_neighbors) > 0 and self.neighbor_manager.local_robot_is_broker():
+        if len(remote_neighbors) > 0 and self.local_robot_is_broker(neighbors_in_range_list):
             if self.params["evaluation.enable_logs"]: start_time = time.time()
             # Find matches that maximize the algebraic connectivity
             selection = self.lcm.select_candidates(
@@ -500,7 +520,10 @@ class GlobalDescriptorLoopClosureDetection(object):
             return
         if len(msg.descriptors) == 0:
             return
-        if msg.descriptors[0].robot_id != self.params['robot_id']:
+        sender_robot_id = msg.descriptors[0].robot_id
+        if sender_robot_id not in self.remote_neighbors_in_range():
+            return
+        if sender_robot_id != self.params['robot_id']:
             unknown_range = self.neighbor_manager.get_unknown_range(
                 msg.descriptors)
             for i in unknown_range:
@@ -518,6 +541,8 @@ class GlobalDescriptorLoopClosureDetection(object):
             msg (cslam_common_interfaces::msg::InterRobotMatches): matches
         """
         if not self.local_robot_is_in_rendezvous():
+            return
+        if msg.robot_id not in self.remote_neighbors_in_range():
             return
         if msg.robot_id != self.params['robot_id']:
             for match in msg.matches:
@@ -545,6 +570,14 @@ class GlobalDescriptorLoopClosureDetection(object):
             msg (cslam_common_interfaces::msg::InterRobotLoopClosure): Inter-robot loop closure
         """
         if not self.local_robot_is_in_rendezvous():
+            return
+        remote_robot_ids = [
+            msg.robot0_id if msg.robot1_id == self.params['robot_id'] else msg.robot1_id
+        ]
+        if (
+            self.params['robot_id'] in (msg.robot0_id, msg.robot1_id) and
+            remote_robot_ids[0] not in self.remote_neighbors_in_range()
+        ):
             return
         if msg.success:
             self.node.get_logger().info(
