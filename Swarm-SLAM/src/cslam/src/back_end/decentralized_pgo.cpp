@@ -121,6 +121,20 @@ size_t insert_missing_pose_values(gtsam::Values::shared_ptr target,
   return inserted;
 }
 
+gtsam::Values::shared_ptr pose_values_for_robot(const gtsam::Values &source,
+                                                unsigned int robot_id)
+{
+  auto values = boost::make_shared<gtsam::Values>();
+  for (const auto key : source.keys())
+  {
+    if (ROBOT_ID(gtsam::LabeledSymbol(key).label()) == robot_id)
+    {
+      values->insert(key, source.at<gtsam::Pose3>(key));
+    }
+  }
+  return values;
+}
+
 gtsam::Values::shared_ptr local_odometry_with_relayed_remote_values(
     const gtsam::Values::shared_ptr &local_odometry,
     const gtsam::Values::shared_ptr &current_estimates,
@@ -140,13 +154,93 @@ gtsam::Values::shared_ptr local_odometry_with_relayed_remote_values(
   return values;
 }
 
-void append_reconstructed_odometry_edges(
+std::pair<gtsam::Key, gtsam::Key> normalized_factor_keys(gtsam::Key key0,
+                                                         gtsam::Key key1)
+{
+  if (key0 < key1)
+  {
+    return {key0, key1};
+  }
+  return {key1, key0};
+}
+
+bool append_between_factor_if_unique(
+    const gtsam::BetweenFactor<gtsam::Pose3> &factor,
+    const gtsam::NonlinearFactorGraph::shared_ptr &graph,
+    std::set<std::pair<gtsam::Key, gtsam::Key>> &added_factors,
+    const gtsam::Values *required_values = nullptr)
+{
+  if (required_values != nullptr &&
+      (!required_values->exists(factor.key1()) ||
+       !required_values->exists(factor.key2())))
+  {
+    return false;
+  }
+
+  const auto keys = normalized_factor_keys(factor.key1(), factor.key2());
+  if (added_factors.count(keys) > 0)
+  {
+    return false;
+  }
+
+  graph->push_back(factor);
+  added_factors.insert(keys);
+  return true;
+}
+
+bool append_factor_if_unique(
+    const gtsam::NonlinearFactor::shared_ptr &factor,
+    const gtsam::NonlinearFactorGraph::shared_ptr &graph,
+    std::set<std::pair<gtsam::Key, gtsam::Key>> &added_factors,
+    const gtsam::Values *required_values = nullptr)
+{
+  auto between_factor =
+      boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3>>(factor);
+  if (!between_factor)
+  {
+    return false;
+  }
+  return append_between_factor_if_unique(
+      *between_factor, graph, added_factors, required_values);
+}
+
+size_t append_factor_graph_if_unique(
+    const gtsam::NonlinearFactorGraph &source,
+    const gtsam::NonlinearFactorGraph::shared_ptr &target,
+    std::set<std::pair<gtsam::Key, gtsam::Key>> &added_factors,
+    const gtsam::Values *required_values = nullptr)
+{
+  size_t inserted = 0;
+  for (const auto &factor : source)
+  {
+    if (append_factor_if_unique(
+            factor, target, added_factors, required_values))
+    {
+      inserted++;
+    }
+  }
+  return inserted;
+}
+
+size_t append_factor_graph_if_unique(
+    const gtsam::NonlinearFactorGraph::shared_ptr &source,
+    const gtsam::NonlinearFactorGraph::shared_ptr &target,
+    std::set<std::pair<gtsam::Key, gtsam::Key>> &added_factors,
+    const gtsam::Values *required_values = nullptr)
+{
+  return append_factor_graph_if_unique(
+      *source, target, added_factors, required_values);
+}
+
+size_t append_reconstructed_odometry_edges(
     const gtsam::Values &values,
     unsigned int local_robot_id,
     const gtsam::SharedNoiseModel &noise_model,
-    const gtsam::NonlinearFactorGraph::shared_ptr &graph)
+    const gtsam::NonlinearFactorGraph::shared_ptr &graph,
+    std::set<std::pair<gtsam::Key, gtsam::Key>> &added_factors)
 {
   std::map<unsigned int, std::vector<gtsam::Key>> keys_by_robot;
+  size_t inserted = 0;
   for (const auto key : values.keys())
   {
     const auto symbol = gtsam::LabeledSymbol(key);
@@ -171,11 +265,16 @@ void append_reconstructed_odometry_edges(
       const auto current_key = keys[i];
       const auto previous_pose = values.at<gtsam::Pose3>(previous_key);
       const auto current_pose = values.at<gtsam::Pose3>(current_key);
-      graph->push_back(gtsam::BetweenFactor<gtsam::Pose3>(
+      gtsam::BetweenFactor<gtsam::Pose3> factor(
           previous_key, current_key, previous_pose.between(current_pose),
-          noise_model));
+          noise_model);
+      if (append_between_factor_if_unique(factor, graph, added_factors))
+      {
+        inserted++;
+      }
     }
   }
+  return inserted;
 }
 } // namespace
 
@@ -660,16 +759,17 @@ cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(co
   out_msg.values = gtsam_values_to_msg(values_to_send);
 
   auto graph = boost::make_shared<gtsam::NonlinearFactorGraph>();
-  graph->push_back(pose_graph_->begin(), pose_graph_->end());
+  std::set<std::pair<gtsam::Key, gtsam::Key>> added_factors;
+  append_factor_graph_if_unique(pose_graph_, graph, added_factors);
   if (has_merged_estimates)
   {
     append_reconstructed_odometry_edges(
-        *values_to_send, robot_id_, default_noise_model_, graph);
+        *values_to_send, robot_id_, default_noise_model_, graph,
+        added_factors);
   }
 
   std::set<unsigned int> connected_robots(connected_robots_.begin(),
                                           connected_robots_.end());
-  std::set<std::pair<gtsam::Key, gtsam::Key>> added_loop_closures;
   std::set<unsigned int> value_robot_ids = robot_ids_in_values(*values_to_send);
 
   for (auto robot0_id : value_robot_ids)
@@ -688,12 +788,11 @@ cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(co
       {
         if (values_to_send->exists(factor.key1()) &&
             values_to_send->exists(factor.key2()) &&
-            added_loop_closures.count({factor.key1(), factor.key2()}) == 0)
+            append_between_factor_if_unique(
+                factor, graph, added_factors, values_to_send.get()))
         {
           connected_robots.insert(min_robot_id);
           connected_robots.insert(max_robot_id);
-          graph->push_back(factor);
-          added_loop_closures.insert({factor.key1(), factor.key2()});
         }
       }
     }
@@ -909,8 +1008,8 @@ DecentralizedPGO::aggregate_pose_graphs()
   // Aggregate graphs
   auto graph = boost::make_shared<gtsam::NonlinearFactorGraph>();
   auto estimates = boost::make_shared<gtsam::Values>();
+  std::set<std::pair<gtsam::Key, gtsam::Key>> added_factors;
   // Local graph
-  graph->push_back(pose_graph_->begin(), pose_graph_->end());
   const bool has_merged_estimates = has_pose_values_from_other_robots(
       *current_pose_estimates_, robot_id_);
   auto local_values =
@@ -919,11 +1018,9 @@ DecentralizedPGO::aggregate_pose_graphs()
                 odometry_pose_estimates_, current_pose_estimates_, robot_id_)
           : odometry_pose_estimates_;
   estimates->insert(*local_values);
-  if (has_merged_estimates)
-  {
-    append_reconstructed_odometry_edges(
-        *local_values, robot_id_, default_noise_model_, graph);
-  }
+  const size_t inserted_local_factors =
+      append_factor_graph_if_unique(pose_graph_, graph, added_factors);
+  size_t inserted_relayed_factors = 0;
   tentative_local_pose_at_latest_optimization_ = latest_local_pose_;
   tentative_local_symbol_at_latest_optimization_ = latest_local_symbol_;
   size_t inserted_remote_values = 0;
@@ -940,7 +1037,6 @@ DecentralizedPGO::aggregate_pose_graphs()
     }
   }
 
-  std::set<std::pair<gtsam::Key, gtsam::Key>> added_loop_closures;
   // Add local inter-robot loop closures
   const auto included_robot_ids = robot_ids_in_values(*estimates);
   for (auto robot0_id : included_robot_ids)
@@ -959,12 +1055,9 @@ DecentralizedPGO::aggregate_pose_graphs()
         unsigned int max_id = std::max(robot0_id, robot1_id);
         for (const auto &factor : inter_robot_loop_closures_[{min_id, max_id}])
         {
-          if (estimates->exists(factor.key1()) &&
-              estimates->exists(factor.key2()) &&
-              added_loop_closures.count({factor.key1(), factor.key2()}) == 0)
+          if (append_between_factor_if_unique(
+                  factor, graph, added_factors, estimates.get()))
           {
-            graph->push_back(factor);
-            added_loop_closures.insert({factor.key1(), factor.key2()});
             inserted_inter_robot_loop_closures++;
           }
         }
@@ -980,6 +1073,10 @@ DecentralizedPGO::aggregate_pose_graphs()
       auto factor =
           boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3>>(
               factor_);
+      if (!factor)
+      {
+        continue;
+      }
       unsigned int robot0_id =
           ROBOT_ID(gtsam::LabeledSymbol(factor->key1()).label());
       unsigned int robot1_id =
@@ -987,16 +1084,19 @@ DecentralizedPGO::aggregate_pose_graphs()
       if (is_pose_graph_connected[robot0_id] &&
           is_pose_graph_connected[robot1_id])
       {
-        if (estimates->exists(factor->key1()) &&
-            estimates->exists(factor->key2()) &&
-            added_loop_closures.count({factor->key1(), factor->key2()}) == 0)
+        if (append_factor_if_unique(
+                factor_, graph, added_factors, estimates.get()))
         {
-          graph->push_back(factor);
-          added_loop_closures.insert({factor->key1(), factor->key2()});
           inserted_remote_factors++;
         }
       }
     }
+  }
+  if (has_merged_estimates)
+  {
+    inserted_relayed_factors += append_reconstructed_odometry_edges(
+        *local_values, robot_id_, default_noise_model_, graph,
+        added_factors);
   }
 
   RCLCPP_INFO(
@@ -1007,7 +1107,7 @@ DecentralizedPGO::aggregate_pose_graphs()
       odometry_pose_estimates_->size(),
       inserted_remote_values,
       estimates->size(),
-      pose_graph_->size(),
+      inserted_local_factors + inserted_relayed_factors,
       inserted_remote_factors,
       inserted_inter_robot_loop_closures,
       graph->size());
@@ -1208,13 +1308,11 @@ void DecentralizedPGO::visualization_callback()
     cslam_common_interfaces::msg::PoseGraph out_msg;
     out_msg.robot_id = robot_id_;
     out_msg.origin_robot_id = origin_robot_id_;
-    // Prefer optimized estimates after a merge, but keep the local graph
-    // complete before this robot is connected to the global optimized graph.
-    // current_pose_estimates_ can temporarily contain only a shared subset,
-    // while pose_graph_ already has odometry edges for all local keyframes.
-    if (current_pose_estimates_->size() >= odometry_pose_estimates_->size())
+    auto local_current_estimates =
+        pose_values_for_robot(*current_pose_estimates_, robot_id_);
+    if (local_current_estimates->size() >= odometry_pose_estimates_->size())
     {
-      out_msg.values = gtsam_values_to_msg(current_pose_estimates_);
+      out_msg.values = gtsam_values_to_msg(local_current_estimates);
     }
     else
     {
