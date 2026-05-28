@@ -1,5 +1,6 @@
 bool success
 
+uint32 sender_id
 uint32 origin_robot_id
 
 cslam_common_interfaces/PoseGraphEdge[] factors

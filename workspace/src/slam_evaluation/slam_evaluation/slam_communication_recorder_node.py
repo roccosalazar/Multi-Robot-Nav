@@ -720,8 +720,11 @@ class SlamCommunicationRecorder(Node):
         elif traffic_class == 'optimized_estimates':
             source_robot, source_method = self._direct_robot_field(
                 msg,
-                ['robot_id', 'source_robot_id', 'sender_id', 'origin_robot_id'],
+                ['sender_id', 'source_robot_id', 'robot_id'],
             )
+            if topic_robot:
+                peer_robot = topic_robot
+                peer_method = 'target_topic_namespace'
         elif traffic_class == 'heartbeat':
             if topic_robot:
                 source_robot = topic_robot
@@ -753,24 +756,31 @@ class SlamCommunicationRecorder(Node):
             )
 
         if source_robot in (self.UNKNOWN_ROBOT, self.MULTIPLE_ROBOTS):
+            source_field_names = {
+                'source_robot',
+                'source_robot_id',
+                'sender_robot',
+                'sender_id',
+                'robot_name',
+                'robot_id',
+                'origin_robot_id',
+            }
+            if traffic_class == 'optimized_estimates':
+                source_field_names.discard('origin_robot_id')
             nested = self._nested_robot_values(
                 msg,
-                {
-                    'source_robot',
-                    'source_robot_id',
-                    'sender_robot',
-                    'sender_id',
-                    'robot_name',
-                    'robot_id',
-                    'origin_robot_id',
-                },
+                source_field_names,
             )
             nested_robot, nested_method = self._unique_robot_from_values(nested)
             if nested_robot != self.UNKNOWN_ROBOT:
                 source_robot = nested_robot
                 source_method = nested_method
 
-        if source_robot == self.UNKNOWN_ROBOT and topic_robot:
+        if (
+            source_robot == self.UNKNOWN_ROBOT
+            and topic_robot
+            and traffic_class != 'optimized_estimates'
+        ):
             source_robot = topic_robot
             source_method = 'topic_namespace'
 
@@ -972,8 +982,11 @@ class SlamCommunicationRecorder(Node):
             'attribution_notes': [
                 (
                     'source_robot is inferred from Swarm payload fields such '
-                    'as robot_id/origin_robot_id when present, otherwise from '
-                    'the topic namespace when possible.'
+                    'as sender_id, source_robot_id, robot_id and '
+                    'origin_robot_id when semantically valid, otherwise from '
+                    'the topic namespace when possible. For optimized '
+                    'estimates, origin_robot_id identifies the global frame '
+                    'origin and is not treated as the sender.'
                 ),
                 (
                     'peer_robot is only filled when a destination/peer is '

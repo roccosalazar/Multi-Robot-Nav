@@ -2379,6 +2379,101 @@ def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
         if run_duration_min is not None and run_duration_min > 0:
             axis.set_xlim(0.0, run_duration_min)
 
+    def load_rendezvous_window_spans() -> list[tuple[str, float, float]]:
+        log_path = run_dir / "output_swarm_multi.log"
+        if not log_path.is_file():
+            return []
+
+        pattern = re.compile(
+            r"\[(?P<wall>\d+(?:\.\d+)?)\].*Simulated rendezvous schedule of robot "
+            r"(?P<schedule>\d+(?:,\d+)*)"
+        )
+        schedules: dict[int, tuple[float, list[int]]] = {}
+        try:
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except Exception:
+            return []
+
+        for line in lines:
+            match = pattern.search(line)
+            if match is None:
+                continue
+            fields = [int(field) for field in match.group("schedule").split(",")]
+            if len(fields) < 3:
+                continue
+            robot_id = fields[0]
+            values = fields[1:]
+            if len(values) % 2 != 0:
+                continue
+            wall_time = float(match.group("wall"))
+            if robot_id not in schedules or wall_time < schedules[robot_id][0]:
+                schedules[robot_id] = (wall_time, values)
+
+        ranges_by_robot: dict[int, list[tuple[float, float]]] = {}
+        for robot_id, (base_wall_time, values) in schedules.items():
+            ranges_by_robot[robot_id] = [
+                (base_wall_time + start, base_wall_time + end)
+                for start, end in zip(values[0::2], values[1::2])
+            ]
+
+        spans: list[tuple[str, float, float]] = []
+        robot_ids = sorted(ranges_by_robot)
+        for i, robot_a in enumerate(robot_ids):
+            for robot_b in robot_ids[i + 1 :]:
+                for start_a, end_a in ranges_by_robot[robot_a]:
+                    for start_b, end_b in ranges_by_robot[robot_b]:
+                        start = max(start_a, start_b)
+                        end = min(end_a, end_b)
+                        if end <= start:
+                            continue
+                        spans.append((f"r{robot_a}-r{robot_b}", start, end))
+        return sorted(spans, key=lambda item: (item[1], item[2], item[0]))
+
+    rendezvous_window_spans = load_rendezvous_window_spans()
+
+    def shade_rendezvous_windows(axes) -> None:
+        if not rendezvous_window_spans:
+            return
+        axes_array = np.atleast_1d(axes)
+        window_colors = {
+            "r0-r1": "#66c2a5",
+            "r0-r2": "#fc8d62",
+            "r1-r2": "#8da0cb",
+        }
+        for axis in axes_array:
+            for label, start_wall, end_wall in rendezvous_window_spans:
+                start_min, end_min = wall_timestamps_to_run_minutes(
+                    np.asarray([start_wall, end_wall], dtype=float)
+                )
+                if not np.isfinite(start_min) or not np.isfinite(end_min):
+                    continue
+                axis.axvspan(
+                    start_min,
+                    end_min,
+                    color=window_colors.get(label, "#bdbdbd"),
+                    alpha=0.16,
+                    linewidth=0,
+                    zorder=0,
+                )
+        label_axis = axes_array[0]
+        for label, start_wall, end_wall in rendezvous_window_spans:
+            start_min, end_min = wall_timestamps_to_run_minutes(
+                np.asarray([start_wall, end_wall], dtype=float)
+            )
+            if not np.isfinite(start_min) or not np.isfinite(end_min):
+                continue
+            label_axis.text(
+                (start_min + end_min) / 2.0,
+                0.96,
+                label,
+                ha="center",
+                va="top",
+                fontsize="small",
+                color="#333333",
+                transform=label_axis.get_xaxis_transform(),
+                zorder=3,
+            )
+
     def aggregate_bandwidth_windows(
         df: pd.DataFrame,
         extra_columns: Sequence[str] = (),
@@ -2423,14 +2518,52 @@ def make_communication_plots(run_dir: Path, output_dir: Path) -> None:
             )
             finite = np.isfinite(starts) & np.isfinite(ends) & np.isfinite(y)
             if np.any(finite):
-                axis.hlines(
-                    y[finite],
-                    starts[finite],
-                    ends[finite],
+                ordered = np.argsort(starts[finite])
+                starts = starts[finite][ordered]
+                ends = ends[finite][ordered]
+                y = y[finite][ordered]
+                plot_start = 0.0 if run_duration_min is not None else float(np.nanmin(starts))
+                plot_end = (
+                    run_duration_min
+                    if run_duration_min is not None and run_duration_min > 0
+                    else float(np.nanmax(ends))
+                )
+                xs = [plot_start]
+                ys = [0.0]
+                current_x = plot_start
+                for start, end, value in zip(starts, ends, y):
+                    start = max(float(start), plot_start)
+                    end = min(float(end), plot_end)
+                    if end <= plot_start or start >= plot_end or end <= start:
+                        continue
+                    if start > current_x:
+                        if ys[-1] != 0.0:
+                            xs.append(current_x)
+                            ys.append(0.0)
+                        xs.append(start)
+                        ys.append(0.0)
+                    else:
+                        xs.append(start)
+                        ys.append(ys[-1])
+                    xs.append(start)
+                    ys.append(float(value))
+                    xs.append(end)
+                    ys.append(float(value))
+                    current_x = max(current_x, end)
+                if current_x < plot_end:
+                    if ys[-1] != 0.0:
+                        xs.append(current_x)
+                        ys.append(0.0)
+                    xs.append(plot_end)
+                    ys.append(0.0)
+                axis.plot(
+                    xs,
+                    ys,
                     linewidth=linewidth,
                     color=color,
                     alpha=alpha,
                     label=label,
+                    zorder=2,
                 )
             return
         time_min = wall_timestamps_to_run_minutes(df["timestamp"].to_numpy(dtype=float))
@@ -2449,7 +2582,8 @@ These plots show estimated logical inter-robot SLAM communication.
 
 - X axis: minutes from run start in ROS time when ground truth timestamps are available; otherwise minutes from the first recorded communication sample.
 - Y axis: serialized ROS message payload bandwidth in MB/s.
-- Bandwidth time series are drawn as horizontal segments over each recorder sample window, so gaps without recorded messages are not visually connected.
+- Bandwidth time series are drawn as continuous piecewise-constant lines over the full run; gaps without recorded messages are shown as zero bandwidth.
+- If a simulated rendezvous schedule is present in the run log, colored background bands mark the pairwise rendezvous windows. They are contextual only: traffic outside those bands is still plotted.
 - `bandwidth_over_time.png` sums measured communication topics per recorder sample window.
 - `bandwidth_by_source_robot.png` appears when the recorder saved source_robot attribution. It uses a stacked layout with total bandwidth on top and one panel per source robot below.
 - `total_mb_by_source_robot.png` appears when robot-level communication totals are available.
@@ -2469,6 +2603,7 @@ These plots show estimated logical inter-robot SLAM communication.
         topic_series = aggregate_bandwidth_windows(communication, ["topic"])
 
         fig, axis = plt.subplots(figsize=(11, 5.5))
+        shade_rendezvous_windows(axis)
         plot_bandwidth_windows(
             axis,
             total,
@@ -2516,6 +2651,7 @@ These plots show estimated logical inter-robot SLAM communication.
                 axes = np.atleast_1d(axes)
 
                 total_by_source = aggregate_bandwidth_windows(robot_series)
+                shade_rendezvous_windows(axes)
                 plot_bandwidth_windows(
                     axes[0],
                     total_by_source,
@@ -2525,7 +2661,7 @@ These plots show estimated logical inter-robot SLAM communication.
                 )
                 axes[0].set_ylabel("Total\n[MB/s]")
                 axes[0].grid(True, alpha=0.25)
-                axes[0].legend(loc="upper right", fontsize="small")
+                axes[0].legend(loc="upper left", fontsize="small")
 
                 color_cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
                 robot_colors = {

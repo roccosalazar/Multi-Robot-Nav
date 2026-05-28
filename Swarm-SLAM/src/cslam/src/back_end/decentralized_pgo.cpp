@@ -1156,8 +1156,8 @@ void DecentralizedPGO::optimized_estimates_callback(
 
     RCLCPP_INFO(
         node_->get_logger(),
-        "[DEBUG_BACKEND_PIPELINE] optimized_estimates applied origin_robot_id=%u estimates=%zu",
-        origin_robot_id_, msg->estimates.size());
+        "[DEBUG_BACKEND_PIPELINE] optimized_estimates applied sender_id=%u origin_robot_id=%u estimates=%zu",
+        msg->sender_id, origin_robot_id_, msg->estimates.size());
   }
   else
   {
@@ -1182,6 +1182,7 @@ void DecentralizedPGO::share_optimized_estimates(
   {
     cslam_common_interfaces::msg::OptimizationResult msg;
     msg.success = true;
+    msg.sender_id = robot_id_;
     msg.origin_robot_id = origin_robot_id_;
     const unsigned int target_robot_id = included_robots_ids.robots.ids[i];
     const bool share_full_component =
@@ -1201,9 +1202,10 @@ void DecentralizedPGO::share_optimized_estimates(
         msg);
     RCLCPP_INFO(
         node_->get_logger(),
-        "[DEBUG_BACKEND_PIPELINE] share_optimized_estimates target_robot=%u origin_robot_id=%u shared_estimates=%zu total_estimates=%zu full_component=%s",
-        target_robot_id, origin_robot_id_, msg.estimates.size(),
-        estimates.size(), share_full_component ? "true" : "false");
+        "[DEBUG_BACKEND_PIPELINE] share_optimized_estimates target_robot=%u sender_id=%u origin_robot_id=%u shared_estimates=%zu total_estimates=%zu full_component=%s",
+        target_robot_id, msg.sender_id, origin_robot_id_,
+        msg.estimates.size(), estimates.size(),
+        share_full_component ? "true" : "false");
   }
 }
 
@@ -1549,6 +1551,8 @@ void DecentralizedPGO::check_result_and_finish_optimization()
     {
       cslam_common_interfaces::msg::OptimizationResult msg;
       msg.success = true;
+      msg.sender_id = robot_id_;
+      msg.origin_robot_id = origin_robot_id_;
       msg.factors = gtsam_factors_to_msg(aggregate_pose_graph_.first);
       msg.estimates = gtsam_values_to_msg(result);
       debug_optimization_result_publisher_->publish(msg);
