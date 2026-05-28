@@ -195,6 +195,13 @@ namespace cslam
         void resquest_current_neighbors();
 
         /**
+         * @brief Immediately restart pose graph collection after receiving a
+         * local inter-robot loop closure.
+         *
+         */
+        void request_pose_graph_retry_after_inter_robot_loop();
+
+        /**
          * @brief Sets received pose graphs to false
          *
          */
@@ -418,6 +425,7 @@ namespace cslam
             optimizer_state_publisher_;
 
         bool is_waiting_;
+        bool pending_pose_graph_retry_;
 
         std::string log_folder_;
 

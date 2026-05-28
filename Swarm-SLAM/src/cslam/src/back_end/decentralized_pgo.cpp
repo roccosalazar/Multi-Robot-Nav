@@ -305,9 +305,10 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
   node_->get_parameter("visualization.publishing_period_ms",
                        visualization_period_ms_);
 
-  int max_waiting_param;
+  int max_waiting_param = 60;
   node_->get_parameter("backend.max_waiting_time_sec", max_waiting_param);
   max_waiting_time_sec_ = rclcpp::Duration(max_waiting_param, 0);
+  pending_pose_graph_retry_ = false;
 
   anchor_symbol_ = gtsam::LabeledSymbol();
   warned_missing_initial_keyframe_ = false;
@@ -661,6 +662,8 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
     inter_robot_loop_closures_[{std::min(msg->robot0_id, msg->robot1_id),
                                 std::max(msg->robot0_id, msg->robot1_id)}]
         .push_back(factor);
+    const bool loop_involves_local =
+        msg->robot0_id == robot_id_ || msg->robot1_id == robot_id_;
     if (msg->robot0_id == robot_id_)
     {
       connected_robots_.insert(msg->robot1_id);
@@ -681,6 +684,11 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
         msg->robot1_keyframe_id,
         inter_robot_loop_closures_[pair_key].size(),
         join_id_set(connected_robots_).c_str());
+
+    if (loop_involves_local)
+    {
+      request_pose_graph_retry_after_inter_robot_loop();
+    }
   }
 }
 
@@ -772,8 +780,7 @@ cslam_common_interfaces::msg::PoseGraph DecentralizedPGO::fill_pose_graph_msg(co
         added_factors);
   }
 
-  std::set<unsigned int> connected_robots(connected_robots_.begin(),
-                                          connected_robots_.end());
+  std::set<unsigned int> connected_robots;
   std::set<unsigned int> value_robot_ids = robot_ids_in_values(*values_to_send);
 
   for (auto robot0_id : value_robot_ids)
@@ -954,6 +961,36 @@ void DecentralizedPGO::resquest_current_neighbors()
     return;
   }
   get_current_neighbors_publisher_->publish(std_msgs::msg::String());
+}
+
+void DecentralizedPGO::request_pose_graph_retry_after_inter_robot_loop()
+{
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
+  if (odometry_pose_estimates_->empty())
+  {
+    return;
+  }
+  if (optimizer_state_ == OptimizerState::OPTIMIZATION)
+  {
+    pending_pose_graph_retry_ = true;
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] inter_robot_loop retry queued while optimization is running");
+    return;
+  }
+
+  pending_pose_graph_retry_ = false;
+  end_waiting();
+  reinitialize_received_pose_graphs();
+  optimizer_state_ = OptimizerState::IDLE;
+  resquest_current_neighbors();
+  start_waiting();
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[DEBUG_BACKEND_PIPELINE] inter_robot_loop triggered immediate pose graph retry");
 }
 
 void DecentralizedPGO::start_waiting()
@@ -1545,6 +1582,10 @@ void DecentralizedPGO::check_result_and_finish_optimization()
     publish_merged_visualization_pose_graph(result);
     share_optimized_estimates(result);
     optimizer_state_ = OptimizerState::IDLE;
+    if (pending_pose_graph_retry_)
+    {
+      request_pose_graph_retry_after_inter_robot_loop();
+    }
 
     // Publish result info for monitoring
     if (debug_optimization_result_publisher_->get_subscription_count() > 0)

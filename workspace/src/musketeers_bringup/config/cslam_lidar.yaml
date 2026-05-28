@@ -36,7 +36,7 @@
     backend:
       pose_graph_optimization_start_period_ms: 10000
       pose_graph_optimization_loop_period_ms: 100
-      max_waiting_time_sec: 3600
+      max_waiting_time_sec: 5
       enable_broadcast_tf_frames: true
     evaluation:
       enable_logs: false
