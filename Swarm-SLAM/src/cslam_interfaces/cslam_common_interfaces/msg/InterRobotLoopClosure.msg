@@ -6,3 +6,6 @@ uint32 robot1_id
 bool success
 
 geometry_msgs/Transform transform
+
+bool has_map_transform
+geometry_msgs/Transform map_transform

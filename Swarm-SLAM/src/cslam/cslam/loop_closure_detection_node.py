@@ -24,6 +24,11 @@ class LoopClosureDetection(Node):
                         ('frontend.netvlad.pca_checkpoint', ''), ('frontend.nn_checkpoint', 'models/resnet18_64.pth'),
                         ('robot_id', 0), ('max_nb_robots', 10),
                         ('frontend.inter_robot_loop_closure_budget', 5),
+                        ('frontend.enable_inter_loop_consistency_check', True),
+                        ('frontend.inter_loop_consistency_min_cluster_size', 3),
+                        ('frontend.inter_loop_consistency_max_translation_m', 2.0),
+                        ('frontend.inter_loop_consistency_max_rotation_deg', 5.0),
+                        ('frontend.inter_loop_consistency_max_pending_edges', 100),
                         ('frontend.inter_robot_detection_period_sec', 5),
                         ('frontend.nb_best_matches', 10), ('frontend.image_crop_size', 376),
                         ('frontend.intra_loop_min_inbetween_keyframes', 10),
@@ -62,6 +67,16 @@ class LoopClosureDetection(Node):
         self.params['max_nb_robots'] = self.get_parameter('max_nb_robots').value
         self.params['frontend.inter_robot_loop_closure_budget'] = self.get_parameter(
             'frontend.inter_robot_loop_closure_budget').value
+        self.params['frontend.enable_inter_loop_consistency_check'] = self.get_parameter(
+            'frontend.enable_inter_loop_consistency_check').value
+        self.params['frontend.inter_loop_consistency_min_cluster_size'] = self.get_parameter(
+            'frontend.inter_loop_consistency_min_cluster_size').value
+        self.params['frontend.inter_loop_consistency_max_translation_m'] = self.get_parameter(
+            'frontend.inter_loop_consistency_max_translation_m').value
+        self.params['frontend.inter_loop_consistency_max_rotation_deg'] = self.get_parameter(
+            'frontend.inter_loop_consistency_max_rotation_deg').value
+        self.params['frontend.inter_loop_consistency_max_pending_edges'] = self.get_parameter(
+            'frontend.inter_loop_consistency_max_pending_edges').value
         self.params['frontend.enable_intra_robot_loop_closures'] = self.get_parameter(
             'frontend.enable_intra_robot_loop_closures').value
         self.params['frontend.inter_robot_detection_period_sec'] = self.get_parameter(
@@ -112,6 +127,10 @@ class LoopClosureDetection(Node):
             f"descriptor_technique={self.params['frontend.global_descriptor_technique']} "
             f"sim_threshold={self.params['frontend.similarity_threshold']} "
             f"inter_robot_budget={self.params['frontend.inter_robot_loop_closure_budget']} "
+            f"inter_loop_consistency={self.params['frontend.enable_inter_loop_consistency_check']} "
+            f"inter_loop_min_cluster={self.params['frontend.inter_loop_consistency_min_cluster_size']} "
+            f"inter_loop_max_trans_m={self.params['frontend.inter_loop_consistency_max_translation_m']} "
+            f"inter_loop_max_rot_deg={self.params['frontend.inter_loop_consistency_max_rotation_deg']} "
             f"descriptor_topic={self.get_parameter('frontend.global_descriptors_topic').value} "
             f"inter_robot_matches_topic={self.get_parameter('frontend.inter_robot_matches_topic').value} "
             f"enable_simulated_rendezvous={self.params['evaluation.enable_simulated_rendezvous']} "

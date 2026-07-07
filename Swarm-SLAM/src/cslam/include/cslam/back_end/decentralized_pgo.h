@@ -315,6 +315,7 @@ namespace cslam
 
         gtsam::SharedNoiseModel default_noise_model_;
         gtsam::SharedNoiseModel loop_closure_noise_model_;
+        gtsam::SharedNoiseModel inter_robot_loop_closure_noise_model_;
         float rotation_default_noise_std_, translation_default_noise_std_;
         int intra_loop_redundancy_window_source_;
         int intra_loop_redundancy_window_target_;

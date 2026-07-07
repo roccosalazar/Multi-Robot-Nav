@@ -100,8 +100,16 @@ class GlobalDescriptorLoopClosureDetection(object):
         self.local_match_publisher = self.node.create_publisher(
             LocalKeyframeMatch, 'cslam/local_keyframe_match', 100)
 
-        self.receive_inter_robot_loop_closure_subscriber = self.node.create_subscription(
+        self.pending_inter_robot_edges = {}
+        self.confirmed_inter_robot_edge_keys = set()
+        self.confirmed_inter_robot_edge_transforms = {}
+        self.inter_robot_loop_closure_publisher = self.node.create_publisher(
+            InterRobotLoopClosure, '/cslam/inter_robot_loop_closure', 100)
+        self.confirmed_inter_robot_loop_closure_subscriber = self.node.create_subscription(
             InterRobotLoopClosure, '/cslam/inter_robot_loop_closure',
+            self.receive_confirmed_inter_robot_loop_closure, 100)
+        self.receive_inter_robot_loop_closure_subscriber = self.node.create_subscription(
+            InterRobotLoopClosure, '/cslam/inter_robot_loop_closure_candidates',
             self.receive_inter_robot_loop_closure, 100)
 
         self.local_descriptors_request_publishers = {}
@@ -163,6 +171,12 @@ class GlobalDescriptorLoopClosureDetection(object):
             f"keyframe_type={self.keyframe_type} "
             f"global_descriptor_topic={self.params['frontend.global_descriptors_topic']} "
             f"inter_robot_matches_topic={self.params['frontend.inter_robot_matches_topic']} "
+            "inter_robot_loop_candidate_topic=/cslam/inter_robot_loop_closure_candidates "
+            "inter_robot_loop_confirmed_topic=/cslam/inter_robot_loop_closure "
+            f"inter_loop_consistency={self.params['frontend.enable_inter_loop_consistency_check']} "
+            f"inter_loop_min_cluster={self.params['frontend.inter_loop_consistency_min_cluster_size']} "
+            f"inter_loop_max_trans_m={self.params['frontend.inter_loop_consistency_max_translation_m']} "
+            f"inter_loop_max_rot_deg={self.params['frontend.inter_loop_consistency_max_rotation_deg']} "
             "keyframe_input_topic=cslam/keyframe_data"
         )
 
@@ -563,49 +577,291 @@ class GlobalDescriptorLoopClosureDetection(object):
                               msg.robot1_id, msg.robot1_keyframe_id,
                               self.lcm.candidate_selector.fixed_weight)
 
+    def inter_robot_loop_closure_key(self, msg):
+        return (
+            msg.robot0_id,
+            msg.robot0_keyframe_id,
+            msg.robot1_id,
+            msg.robot1_keyframe_id,
+        )
+
+    def inter_robot_pair_key(self, msg):
+        return (
+            min(msg.robot0_id, msg.robot1_id),
+            max(msg.robot0_id, msg.robot1_id),
+        )
+
+    def quaternion_to_matrix(self, q):
+        quat = np.array([q.x, q.y, q.z, q.w], dtype=float)
+        norm = np.linalg.norm(quat)
+        if norm == 0.0 or not np.isfinite(norm):
+            return np.eye(3)
+        x, y, z, w = quat / norm
+        return np.array([
+            [1.0 - 2.0 * (y * y + z * z),
+             2.0 * (x * y - z * w),
+             2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w),
+             1.0 - 2.0 * (x * x + z * z),
+             2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w),
+             2.0 * (y * z + x * w),
+             1.0 - 2.0 * (x * x + y * y)],
+        ])
+
+    def transform_msg_to_matrix(self, transform_msg):
+        matrix = np.eye(4)
+        matrix[:3, :3] = self.quaternion_to_matrix(transform_msg.rotation)
+        matrix[:3, 3] = np.array([
+            transform_msg.translation.x,
+            transform_msg.translation.y,
+            transform_msg.translation.z,
+        ])
+        return matrix
+
+    def invert_transform_matrix(self, matrix):
+        inverse = np.eye(4)
+        rotation = matrix[:3, :3]
+        translation = matrix[:3, 3]
+        inverse[:3, :3] = rotation.T
+        inverse[:3, 3] = -(rotation.T @ translation)
+        return inverse
+
+    def canonical_inter_robot_measurement(self, msg):
+        if getattr(msg, 'has_map_transform', False):
+            return self.transform_msg_to_matrix(msg.map_transform)
+
+        # The lidar registration transform is inverted before it is inserted as
+        # a GTSAM BetweenFactor. Old publishers may not provide a map-transform
+        # hypothesis, so compare candidates in that same measurement convention.
+        measurement = self.invert_transform_matrix(
+            self.transform_msg_to_matrix(msg.transform))
+        if msg.robot0_id <= msg.robot1_id:
+            return measurement
+        return self.invert_transform_matrix(measurement)
+
+    def transform_residual(self, estimate, reference):
+        delta = self.invert_transform_matrix(reference) @ estimate
+        translation_error = np.linalg.norm(delta[:3, 3])
+        cos_angle = (np.trace(delta[:3, :3]) - 1.0) * 0.5
+        rotation_error = np.degrees(
+            np.arccos(np.clip(cos_angle, -1.0, 1.0)))
+        return float(translation_error), float(rotation_error)
+
+    def inter_robot_transforms_are_consistent(self, transform_a, transform_b):
+        translation_error, rotation_error = self.transform_residual(
+            transform_a, transform_b)
+        return (
+            translation_error <=
+            self.params['frontend.inter_loop_consistency_max_translation_m'] and
+            rotation_error <=
+            self.params['frontend.inter_loop_consistency_max_rotation_deg']
+        )
+
+    def can_process_inter_robot_loop_candidate(self, msg):
+        if not self.local_robot_is_in_rendezvous():
+            return False
+        _, neighbors_in_range_list = self.neighbors_in_range()
+        if (msg.robot0_id not in neighbors_in_range_list or
+                msg.robot1_id not in neighbors_in_range_list):
+            return False
+        return self.local_robot_is_broker(neighbors_in_range_list)
+
+    def can_process_confirmed_inter_robot_loop(self, msg):
+        if not self.local_robot_is_in_rendezvous():
+            return False
+        _, neighbors_in_range_list = self.neighbors_in_range()
+        return (
+            msg.robot0_id in neighbors_in_range_list and
+            msg.robot1_id in neighbors_in_range_list
+        )
+
+    def remove_pending_inter_robot_edge(self, msg):
+        pair_key = self.inter_robot_pair_key(msg)
+        edge_key = self.inter_robot_loop_closure_key(msg)
+        if pair_key in self.pending_inter_robot_edges:
+            self.pending_inter_robot_edges[pair_key].pop(edge_key, None)
+
+    def remember_confirmed_inter_robot_transform(self, msg):
+        pair_key = self.inter_robot_pair_key(msg)
+        edge_key = self.inter_robot_loop_closure_key(msg)
+        self.confirmed_inter_robot_edge_transforms.setdefault(pair_key, {})[
+            edge_key] = self.canonical_inter_robot_measurement(msg)
+
+    def mark_confirmed_inter_robot_loop_closure(self, msg):
+        edge_key = self.inter_robot_loop_closure_key(msg)
+        if edge_key in self.confirmed_inter_robot_edge_keys:
+            return False
+
+        self.confirmed_inter_robot_edge_keys.add(edge_key)
+        self.remove_pending_inter_robot_edge(msg)
+        self.remember_confirmed_inter_robot_transform(msg)
+        self.node.get_logger().info(
+            'Confirmed inter-robot loop closure measurement: (' +
+            str(msg.robot0_id) + ',' + str(msg.robot0_keyframe_id) +
+            ') -> (' + str(msg.robot1_id) + ',' +
+            str(msg.robot1_keyframe_id) + ')')
+        self.lcm.candidate_selector.candidate_edges_to_fixed(
+            [self.inter_robot_loop_closure_msg_to_edge(msg)])
+
+        if self.params["evaluation.enable_logs"]:
+            self.log_total_successful_matches += 1
+            self.log_publisher.publish(
+                KeyValue(key="nb_matches",
+                         value=str(self.log_total_successful_matches)))
+        return True
+
+    def publish_confirmed_inter_robot_loop_closure(self, msg):
+        self.mark_confirmed_inter_robot_loop_closure(msg)
+        self.inter_robot_loop_closure_publisher.publish(msg)
+
+    def prune_pending_inter_robot_edges(self, pair_key):
+        max_pending = self.params[
+            'frontend.inter_loop_consistency_max_pending_edges']
+        if max_pending <= 0:
+            return
+        pending_edges = self.pending_inter_robot_edges.get(pair_key, {})
+        while len(pending_edges) > max_pending:
+            oldest_key = next(iter(pending_edges))
+            pending_edges.pop(oldest_key, None)
+            self.node.get_logger().warn(
+                "[DEBUG_LC_PIPELINE] dropping old pending inter-loop "
+                f"pair={pair_key} edge={oldest_key} "
+                f"max_pending={max_pending}")
+
+    def find_consistent_pending_inter_robot_cluster(self, pair_key):
+        pending_edges = self.pending_inter_robot_edges.get(pair_key, {})
+        min_cluster_size = self.params[
+            'frontend.inter_loop_consistency_min_cluster_size']
+        if len(pending_edges) < min_cluster_size:
+            return []
+
+        records = [
+            (edge_key, msg, transform)
+            for edge_key, (msg, transform) in pending_edges.items()
+        ]
+        best_cluster = []
+        for seed in records:
+            cluster = [seed]
+            for candidate in records:
+                if candidate[0] == seed[0]:
+                    continue
+                if all(
+                        self.inter_robot_transforms_are_consistent(
+                            candidate[2], selected[2])
+                        for selected in cluster):
+                    cluster.append(candidate)
+            if len(cluster) > len(best_cluster):
+                best_cluster = cluster
+
+        if len(best_cluster) >= min_cluster_size:
+            return best_cluster
+        return []
+
+    def is_consistent_with_confirmed_inter_robot_cluster(self, pair_key,
+                                                        transform):
+        confirmed_transforms = list(
+            self.confirmed_inter_robot_edge_transforms.get(pair_key,
+                                                          {}).values())
+        min_cluster_size = self.params[
+            'frontend.inter_loop_consistency_min_cluster_size']
+        if len(confirmed_transforms) < min_cluster_size:
+            return False
+        consistent_count = sum(
+            1 for confirmed_transform in confirmed_transforms
+            if self.inter_robot_transforms_are_consistent(
+                transform, confirmed_transform))
+        return consistent_count >= min_cluster_size
+
+    def process_successful_inter_robot_loop_candidate(self, msg):
+        if (not self.params['frontend.enable_inter_loop_consistency_check'] or
+                self.params[
+                    'frontend.inter_loop_consistency_min_cluster_size'] <= 1):
+            self.node.get_logger().warn(
+                "[DEBUG_LC_PIPELINE] inter-loop consistency check disabled; "
+                "publishing candidate directly")
+            self.publish_confirmed_inter_robot_loop_closure(msg)
+            return
+
+        edge_key = self.inter_robot_loop_closure_key(msg)
+        if edge_key in self.confirmed_inter_robot_edge_keys:
+            return
+
+        pair_key = self.inter_robot_pair_key(msg)
+        if not getattr(msg, 'has_map_transform', False):
+            self.node.get_logger().warn(
+                "[DEBUG_LC_PIPELINE] inter-loop candidate has no map "
+                f"transform hypothesis; falling back to measurement edge={edge_key}")
+        transform = self.canonical_inter_robot_measurement(msg)
+        if self.is_consistent_with_confirmed_inter_robot_cluster(pair_key,
+                                                                transform):
+            self.node.get_logger().info(
+                "[DEBUG_LC_PIPELINE] inter-loop candidate consistent with "
+                f"confirmed cluster pair={pair_key} edge={edge_key}")
+            self.publish_confirmed_inter_robot_loop_closure(msg)
+            return
+
+        self.pending_inter_robot_edges.setdefault(pair_key, {})[
+            edge_key] = (msg, transform)
+        self.prune_pending_inter_robot_edges(pair_key)
+
+        cluster = self.find_consistent_pending_inter_robot_cluster(pair_key)
+        min_cluster_size = self.params[
+            'frontend.inter_loop_consistency_min_cluster_size']
+        if len(cluster) >= min_cluster_size:
+            self.node.get_logger().info(
+                "[DEBUG_LC_PIPELINE] confirmed inter-loop cluster "
+                f"pair={pair_key} size={len(cluster)} "
+                f"min_size={min_cluster_size} "
+                "publishing confirmed measurements")
+            for _, cluster_msg, _ in cluster:
+                self.publish_confirmed_inter_robot_loop_closure(cluster_msg)
+            return
+
+        self.node.get_logger().info(
+            "[DEBUG_LC_PIPELINE] pending inter-loop candidate "
+            f"pair={pair_key} edge={edge_key} "
+            f"pending={len(self.pending_inter_robot_edges[pair_key])} "
+            f"min_cluster={min_cluster_size}")
+
+    def process_failed_inter_robot_loop_candidate(self, msg):
+        self.remove_pending_inter_robot_edge(msg)
+        self.node.get_logger().info(
+            'Failed inter-robot loop closure measurement: (' +
+            str(msg.robot0_id) + ',' + str(msg.robot0_keyframe_id) +
+            ') -> (' + str(msg.robot1_id) + ',' +
+            str(msg.robot1_keyframe_id) + ')')
+        self.lcm.candidate_selector.remove_candidate_edges(
+            [self.inter_robot_loop_closure_msg_to_edge(msg)], failed=True)
+
+        if self.params["evaluation.enable_logs"]:
+            self.log_total_failed_matches += 1
+            self.log_publisher.publish(
+                KeyValue(key="nb_failed_matches",
+                         value=str(self.log_total_failed_matches)))
+
+    def receive_confirmed_inter_robot_loop_closure(self, msg):
+        """Receive confirmed inter-robot loop closure.
+
+        This keeps candidate-selector state synchronized on every robot while
+        the backend consumes the same confirmed topic.
+        """
+        if not self.can_process_confirmed_inter_robot_loop(msg):
+            return
+        if msg.success:
+            self.mark_confirmed_inter_robot_loop_closure(msg)
+        else:
+            self.process_failed_inter_robot_loop_candidate(msg)
+
     def receive_inter_robot_loop_closure(self, msg):
-        """Receive computed inter-robot loop closure
+        """Receive computed inter-robot loop closure candidate
 
         Args:
             msg (cslam_common_interfaces::msg::InterRobotLoopClosure): Inter-robot loop closure
         """
-        if not self.local_robot_is_in_rendezvous():
-            return
-        remote_robot_ids = [
-            msg.robot0_id if msg.robot1_id == self.params['robot_id'] else msg.robot1_id
-        ]
-        if (
-            self.params['robot_id'] in (msg.robot0_id, msg.robot1_id) and
-            remote_robot_ids[0] not in self.remote_neighbors_in_range()
-        ):
+        if not self.can_process_inter_robot_loop_candidate(msg):
             return
         if msg.success:
-            self.node.get_logger().info(
-                'New inter-robot loop closure measurement: (' +
-                str(msg.robot0_id) + ',' + str(msg.robot0_keyframe_id) +
-                ') -> (' + str(msg.robot1_id) + ',' +
-                str(msg.robot1_keyframe_id) + ')')
-            # If geo verif succeeds, move from candidate to fixed edge in the graph
-            self.lcm.candidate_selector.candidate_edges_to_fixed(
-                [self.inter_robot_loop_closure_msg_to_edge(msg)])
-
-            if self.params["evaluation.enable_logs"]:
-                self.log_total_successful_matches += 1
-                self.log_publisher.publish(
-                    KeyValue(key="nb_matches",
-                             value=str(self.log_total_successful_matches)))
+            self.process_successful_inter_robot_loop_candidate(msg)
         else:
-            # If geo verif fails, remove candidate
-            self.node.get_logger().info(
-                'Failed inter-robot loop closure measurement: (' +
-                str(msg.robot0_id) + ',' + str(msg.robot0_keyframe_id) +
-                ') -> (' + str(msg.robot1_id) + ',' +
-                str(msg.robot1_keyframe_id) + ')')
-            self.lcm.candidate_selector.remove_candidate_edges(
-                [self.inter_robot_loop_closure_msg_to_edge(msg)], failed=True)
-
-            if self.params["evaluation.enable_logs"]:
-                self.log_total_failed_matches += 1
-                self.log_publisher.publish(
-                    KeyValue(key="nb_failed_matches",
-                             value=str(self.log_total_failed_matches)))
+            self.process_failed_inter_robot_loop_candidate(msg)

@@ -353,11 +353,15 @@ def selected_robot_ids(raw: Iterable[str] | None) -> set[int] | None:
 def normalize_quaternions(quats: np.ndarray) -> np.ndarray:
     quats = np.asarray(quats, dtype=float)
     norms = np.linalg.norm(quats, axis=1)
+    # Ensure `norms` is a plain numpy array so multi-dimensional indexing works
+    # (some types like pandas Index/DataArray disallow `[:, None]`).
+    norms = np.asarray(norms, dtype=float)
     bad = norms < 1e-12
     if np.any(bad):
         quats = quats.copy()
         quats[bad] = np.array([0.0, 0.0, 0.0, 1.0])
         norms = np.linalg.norm(quats, axis=1)
+        norms = np.asarray(norms, dtype=float)
     return quats / norms[:, None]
 
 
@@ -3083,7 +3087,7 @@ These plots show per-keyframe ATE in the final graph.
         time_min = group["time_rel_sec"].to_numpy(dtype=float) / 60.0
 
         fig, axis = plt.subplots(figsize=(11, 5.5))
-        axis.plot(time_min, group["ate_m_rmse"], label="ATE RMSE [m]", linewidth=2)
+        axis.plot(time_min, group["ate_m_rmse"].to_numpy(dtype=float), label="ATE RMSE [m]", linewidth=2)
         add_loop_event_lines(axis, group, time_min)
         axis.set_xlabel("Snapshot time from first graph [min]")
         axis.set_ylabel("ATE [m]")
@@ -3103,7 +3107,7 @@ These plots show per-keyframe ATE in the final graph.
         )
         axes[0].plot(
             time_min,
-            group["ate_m_rmse"],
+            group["ate_m_rmse"].to_numpy(dtype=float),
             label="ATE RMSE [m]",
             linewidth=2.0,
             color="tab:blue",
@@ -3175,7 +3179,7 @@ These plots show per-keyframe ATE in the final graph.
         plt.close(fig)
 
         fig, axis = plt.subplots(figsize=(11, 5.5))
-        axis.plot(time_min, group["rpe_trans_rmse_m"], label="RPE trans RMSE [m]")
+        axis.plot(time_min, group["rpe_trans_rmse_m"].to_numpy(dtype=float), label="RPE trans RMSE [m]")
         add_loop_event_lines(axis, group, time_min)
         axis.set_xlabel("Snapshot time from first graph [min]")
         axis.set_ylabel("RPE translation [m]")
@@ -3183,7 +3187,7 @@ These plots show per-keyframe ATE in the final graph.
         axis2 = axis.twinx()
         axis2.plot(
             time_min,
-            group["rpe_rot_rmse_deg"],
+            group["rpe_rot_rmse_deg"].to_numpy(dtype=float),
             label="RPE rot RMSE [deg]",
             color="tab:orange",
         )
@@ -3202,13 +3206,13 @@ These plots show per-keyframe ATE in the final graph.
             for label, trans_col, rot_col in distance_columns:
                 axes[0].plot(
                     time_min,
-                    group[trans_col],
+                    group[trans_col].to_numpy(dtype=float),
                     linewidth=1.5,
                     label=f"{label} trans",
                 )
                 axes[1].plot(
                     time_min,
-                    group[rot_col],
+                    group[rot_col].to_numpy(dtype=float),
                     linewidth=1.5,
                     label=f"{label} rot",
                 )
@@ -3232,7 +3236,7 @@ These plots show per-keyframe ATE in the final graph.
         if "graph_correction_trans_rmse_m" in group.columns:
             axis.plot(
                 time_min,
-                group["graph_correction_trans_rmse_m"],
+                group["graph_correction_trans_rmse_m"].to_numpy(dtype=float),
                 label="Graph correction trans RMSE [m]",
                 linewidth=1.8,
             )
@@ -3244,7 +3248,7 @@ These plots show per-keyframe ATE in the final graph.
         if "graph_correction_rot_rmse_deg" in group.columns:
             axis2.plot(
                 time_min,
-                group["graph_correction_rot_rmse_deg"],
+                group["graph_correction_rot_rmse_deg"].to_numpy(dtype=float),
                 label="Graph correction rot RMSE [deg]",
                 color="tab:orange",
                 linewidth=1.4,
@@ -3263,10 +3267,10 @@ These plots show per-keyframe ATE in the final graph.
 
     for (source, robot_id), df in point_errors.items():
         fig, axis = plt.subplots(figsize=(7, 7))
-        axis.plot(df["gt_x"], df["gt_y"], label="Ground truth", linewidth=2)
+        axis.plot(df["gt_x"].to_numpy(dtype=float), df["gt_y"].to_numpy(dtype=float), label="Ground truth", linewidth=2)
         axis.plot(
-            df["aligned_graph_x"],
-            df["aligned_graph_y"],
+            df["aligned_graph_x"].to_numpy(dtype=float),
+            df["aligned_graph_y"].to_numpy(dtype=float),
             label="Aligned graph",
             linewidth=1.5,
         )
@@ -3286,7 +3290,7 @@ These plots show per-keyframe ATE in the final graph.
         plt.close(fig)
 
         fig, axis = plt.subplots(figsize=(11, 4.8))
-        axis.plot(df["keyframe_id"], df["ate_m"], linewidth=1.8, label="ATE [m]")
+        axis.plot(df["keyframe_id"].to_numpy(dtype=float), df["ate_m"].to_numpy(dtype=float), linewidth=1.8, label="ATE [m]")
         group = metrics_by_source_robot.get((source, robot_id))
         if group is not None:
             add_loop_keyframe_lines(axis, group)
@@ -3380,8 +3384,8 @@ These plots show per-keyframe ATE in the final graph.
     for (source, robot_id), group in metrics.groupby(["source", "robot_id"]):
         group = group.sort_values("snapshot_seq")
         axis.plot(
-            group["time_rel_sec"] / 60.0,
-            group["ate_m_rmse"],
+            group["time_rel_sec"].to_numpy(dtype=float) / 60.0,
+            group["ate_m_rmse"].to_numpy(dtype=float),
             label=f"{source} r{robot_id}",
             linewidth=1.6,
         )
@@ -4180,6 +4184,9 @@ def main() -> int:
     try:
         output_dir = analyze(args)
     except Exception as exc:
+        import traceback
+
+        traceback.print_exc()
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     print(f"Analysis written to: {output_dir}")

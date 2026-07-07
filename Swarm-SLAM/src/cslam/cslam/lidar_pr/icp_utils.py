@@ -4,11 +4,18 @@ from scipy.spatial.transform import Rotation as R
 from std_msgs.msg import Header
 from sensor_msgs.msg import PointCloud2, PointField
 
+import multiprocessing as mp
 import numpy as np
+import os
 import teaserpp_python
 import open3d
+import platform
+import queue
+import signal
+import sys
 from scipy.spatial import cKDTree
 import rclpy
+import rclpy.logging
 
 FIELDS_XYZ = [
     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
@@ -16,11 +23,110 @@ FIELDS_XYZ = [
     PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
 ]
 
+_warned_icp_refinement_disabled = False
+
 # Partially adapted from https://github.com/MIT-SPARK/TEASER-plusplus/tree/master/examples/teaser_python_fpfh_icp
 
 
 def pcd2xyz(pcd):
     return np.asarray(pcd.points).T
+
+
+def identity_transform_msg():
+    transform = Transform()
+    transform.rotation.w = 1.0
+    return transform
+
+
+def open3d_version_tuple():
+    version = getattr(open3d, "__version__", "0")
+    parts = []
+    for part in version.split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        if digits == "":
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def should_use_icp_refinement():
+    machine = platform.machine().lower()
+    version = open3d_version_tuple()
+    if machine in ("aarch64", "arm64") and version < (0, 19, 0):
+        return False
+    return True
+
+
+def log_icp_refinement_disabled_once():
+    global _warned_icp_refinement_disabled
+    if _warned_icp_refinement_disabled:
+        return
+    _warned_icp_refinement_disabled = True
+    rclpy.logging.get_logger('cslam').warn(
+        'Open3D ICP refinement disabled for loop closure registration '
+        f'on {platform.machine()} with Open3D {getattr(open3d, "__version__", "unknown")}; '
+        'using TEASER++ plus NumPy fitness/RMSE verification.')
+
+
+def transform_is_finite(translation, rotation):
+    return (
+        np.isfinite(np.asarray(translation)).all()
+        and np.isfinite(np.asarray(rotation)).all()
+    )
+
+
+def count_correspondence_inliers(src_corr, dst_corr, translation, rotation,
+                                 noise_bound):
+    transformed = np.asarray(rotation) @ src_corr + np.asarray(translation).reshape(3, 1)
+    residuals = np.linalg.norm(transformed - dst_corr, axis=0)
+    return int(np.count_nonzero(residuals <= noise_bound))
+
+
+def evaluate_transform_numpy(src, dst, translation, rotation,
+                             max_correspondence_distance):
+    src_points = np.asarray(src.points)
+    dst_points = np.asarray(dst.points)
+    if len(src_points) == 0 or len(dst_points) == 0:
+        return 0.0, float("inf")
+
+    transformed = (np.asarray(rotation) @ src_points.T).T + np.asarray(translation)
+    nearest_neighbor_tree = cKDTree(dst_points)
+    distances, _ = nearest_neighbor_tree.query(transformed, k=1, workers=-1)
+    inliers = distances <= max_correspondence_distance
+    inlier_count = int(np.count_nonzero(inliers))
+    if inlier_count == 0:
+        return 0.0, float("inf")
+
+    fitness = inlier_count / float(len(src_points))
+    rmse = float(np.sqrt(np.mean(distances[inliers] ** 2)))
+    return fitness, rmse
+
+
+def points_to_open3d(points):
+    cloud = open3d.geometry.PointCloud()
+    cloud.points = open3d.utility.Vector3dVector(
+        np.ascontiguousarray(points, dtype=np.float64))
+    return cloud
+
+
+def format_process_exitcode(exitcode):
+    if exitcode is None:
+        return "unknown"
+    if exitcode < 0:
+        try:
+            signame = signal.Signals(-exitcode).name
+        except ValueError:
+            signame = f"signal {-exitcode}"
+        return f"{exitcode} ({signame})"
+    return str(exitcode)
+
+
+def registration_multiprocessing_context():
+    main_module = sys.modules.get("__main__")
+    main_file = getattr(main_module, "__file__", None)
+    if main_file and os.path.exists(main_file):
+        return mp.get_context("spawn")
+    return mp.get_context("fork")
 
 
 def extract_fpfh(pcd, voxel_size):
@@ -93,7 +199,7 @@ def Rt2T(R, t):
 def downsample(points, voxel_size):
 
     mask = np.isfinite(points).all(axis=1)
-    filtered_points = points[mask]
+    filtered_points = np.ascontiguousarray(points[mask], dtype=np.float64)
 
     open3d_cloud = open3d.geometry.PointCloud()
     open3d_cloud.points = open3d.utility.Vector3dVector(filtered_points)
@@ -101,11 +207,14 @@ def downsample(points, voxel_size):
 
 
 def solve_teaser(src, dst, voxel_size, min_inliers, min_fitness=0.0,
-                 max_rmse=float("inf")):
+                 max_rmse=float("inf"), use_icp_refinement=None):
     if len(src.points) == 0 or len(dst.points) == 0:
         rclpy.logging.get_logger('cslam').info(
             'Failed to compute loop closure. Empty point cloud received.')
         return False, None, None
+
+    if use_icp_refinement is None:
+        use_icp_refinement = should_use_icp_refinement()
 
     src_feats = extract_fpfh(src, voxel_size)
     dst_feats = extract_fpfh(dst, voxel_size)
@@ -130,35 +239,49 @@ def solve_teaser(src, dst, voxel_size, min_inliers, min_fitness=0.0,
     solver.solve(src_corr, dst_corr)
 
     solution = solver.getSolution()
+    if not transform_is_finite(solution.translation, solution.rotation):
+        rclpy.logging.get_logger('cslam').info(
+            'Failed to compute loop closure. Non-finite TEASER++ transform.')
+        return False, None, None
 
-    valid = len(solver.getInlierMaxClique()) > min_inliers
+    inlier_count = count_correspondence_inliers(
+        src_corr, dst_corr, solution.translation, solution.rotation, voxel_size)
+    valid = inlier_count > min_inliers
 
     if valid:
-        # ICP refinement
-        T_teaser = Rt2T(solution.rotation, solution.translation)
-        icp_sol = open3d.pipelines.registration.registration_icp(
-            src, dst, voxel_size, T_teaser,
-            open3d.pipelines.registration.TransformationEstimationPointToPoint(
-            ),
-            open3d.pipelines.registration.ICPConvergenceCriteria(
-                max_iteration=100))
-        if icp_sol.fitness < min_fitness:
+        if use_icp_refinement:
+            # ICP refinement
+            T_teaser = Rt2T(solution.rotation, solution.translation)
+            icp_sol = open3d.pipelines.registration.registration_icp(
+                src, dst, voxel_size, T_teaser,
+                open3d.pipelines.registration.TransformationEstimationPointToPoint(
+                ),
+                open3d.pipelines.registration.ICPConvergenceCriteria(
+                    max_iteration=100))
+            fitness = icp_sol.fitness
+            rmse = icp_sol.inlier_rmse
+            T_icp = icp_sol.transformation
+            solution.translation = T_icp[:3, 3]
+            solution.rotation = T_icp[:3, :3]
+        else:
+            log_icp_refinement_disabled_once()
+            fitness, rmse = evaluate_transform_numpy(
+                src, dst, solution.translation, solution.rotation, voxel_size)
+
+        if fitness < min_fitness:
             rclpy.logging.get_logger('cslam').info(
-                'Failed to compute loop closure. ICP fitness too low '
-                f'( {icp_sol.fitness:.4f} < {min_fitness:.4f} )')
+                'Failed to compute loop closure. Registration fitness too low '
+                f'( {fitness:.4f} < {min_fitness:.4f} )')
             return False, None, None
-        if icp_sol.inlier_rmse > max_rmse:
+        if rmse > max_rmse:
             rclpy.logging.get_logger('cslam').info(
-                'Failed to compute loop closure. ICP RMSE too high '
-                f'( {icp_sol.inlier_rmse:.4f} > {max_rmse:.4f} )')
+                'Failed to compute loop closure. Registration RMSE too high '
+                f'( {rmse:.4f} > {max_rmse:.4f} )')
             return False, None, None
-        T_icp = icp_sol.transformation
-        solution.translation = T_icp[:3, 3]
-        solution.rotation = T_icp[:3, :3]
     else:
         rclpy.logging.get_logger('cslam').info(
             'Failed to compute loop closure. Number of inliers ( {} / {} )'.
-            format(len(solver.getInlierMaxClique()), min_inliers))
+            format(inlier_count, min_inliers))
         return False, None, None
     return True, solution.translation, solution.rotation
 
@@ -200,7 +323,7 @@ def downsample_ros_pointcloud(pc_msg, voxel_size):
     return downsample(points, voxel_size)
 
 def compute_transform(src, dst, voxel_size, min_inliers, min_fitness=0.0,
-                      max_rmse=float("inf")):
+                      max_rmse=float("inf"), use_icp_refinement=None):
     """Computes a 3D transform between 2 point clouds using TEASER++.
 
     Returns the transform that maps ``src`` onto ``dst``.
@@ -217,11 +340,99 @@ def compute_transform(src, dst, voxel_size, min_inliers, min_fitness=0.0,
         (Transform, bool): transform and success flag
     """
     valid, translation, rotation = solve_teaser(
-        src, dst, voxel_size, min_inliers, min_fitness, max_rmse)
+        src, dst, voxel_size, min_inliers, min_fitness, max_rmse,
+        use_icp_refinement)
     if not valid or translation is None or rotation is None:
-        transform = Transform()
-        transform.rotation.w = 1.0
-        return transform, False
+        return identity_transform_msg(), False
 
     transform = to_transform_msg(translation, rotation)
     return transform, True
+
+
+def compute_transform_worker(result_queue, src_points, dst_points, voxel_size,
+                             min_inliers, min_fitness, max_rmse,
+                             use_icp_refinement):
+    try:
+        src = points_to_open3d(src_points)
+        dst = points_to_open3d(dst_points)
+        valid, translation, rotation = solve_teaser(
+            src, dst, voxel_size, min_inliers, min_fitness, max_rmse,
+            use_icp_refinement)
+        if not valid or translation is None or rotation is None:
+            result_queue.put((False, None, None, None))
+            return
+        result_queue.put((
+            True,
+            np.asarray(translation, dtype=float).tolist(),
+            np.asarray(rotation, dtype=float).tolist(),
+            None,
+        ))
+    except BaseException as exc:
+        result_queue.put((False, None, None, repr(exc)))
+
+
+def compute_transform_crash_safe(src, dst, voxel_size, min_inliers,
+                                 min_fitness=0.0, max_rmse=float("inf"),
+                                 timeout_s=30.0,
+                                 use_icp_refinement=None):
+    """Run loop-closure registration in a child process.
+
+    TEASER++ and Open3D execute native code. If that code segfaults, Python
+    cannot catch it in-process; isolating the registration keeps the ROS map
+    manager alive and reports the loop closure as failed instead.
+    """
+    src_points = np.ascontiguousarray(np.asarray(src.points), dtype=np.float64)
+    dst_points = np.ascontiguousarray(np.asarray(dst.points), dtype=np.float64)
+
+    context = registration_multiprocessing_context()
+    result_queue = context.Queue(maxsize=1)
+    process = context.Process(
+        target=compute_transform_worker,
+        args=(
+            result_queue,
+            src_points,
+            dst_points,
+            voxel_size,
+            min_inliers,
+            min_fitness,
+            max_rmse,
+            use_icp_refinement,
+        ),
+    )
+    process.start()
+    process.join(timeout_s)
+
+    logger = rclpy.logging.get_logger('cslam')
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        logger.error(
+            'Loop closure registration timed out '
+            f'after {timeout_s:.1f}s; rejecting candidate.')
+        return identity_transform_msg(), False
+
+    if process.exitcode != 0:
+        logger.error(
+            'Loop closure registration worker crashed with exit code '
+            f'{format_process_exitcode(process.exitcode)}; rejecting candidate '
+            'without stopping the map manager.')
+        return identity_transform_msg(), False
+
+    try:
+        success, translation, rotation, error = result_queue.get(timeout=1.0)
+    except queue.Empty:
+        logger.error(
+            'Loop closure registration worker exited without a result; '
+            'rejecting candidate.')
+        return identity_transform_msg(), False
+
+    if error is not None:
+        logger.error(
+            'Loop closure registration failed with exception in worker: '
+            f'{error}')
+        return identity_transform_msg(), False
+
+    if not success:
+        return identity_transform_msg(), False
+
+    return to_transform_msg(np.asarray(translation), np.asarray(rotation)), True

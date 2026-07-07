@@ -350,6 +350,28 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
   auto loop_base_noise = gtsam::noiseModel::Diagonal::Sigmas(loop_sigmas);
   loop_closure_noise_model_ = gtsam::noiseModel::Robust::Create(
       gtsam::noiseModel::mEstimator::Huber::Create(1.0), loop_base_noise);
+  double inter_robot_loop_rotation_noise_std = 0.10;
+  double inter_robot_loop_translation_noise_std = 1.00;
+  double inter_robot_loop_huber_k = 1.0;
+  node_->get_parameter("backend.inter_robot_loop_rotation_noise_std",
+                       inter_robot_loop_rotation_noise_std);
+  node_->get_parameter("backend.inter_robot_loop_translation_noise_std",
+                       inter_robot_loop_translation_noise_std);
+  node_->get_parameter("backend.inter_robot_loop_huber_k",
+                       inter_robot_loop_huber_k);
+  Eigen::VectorXd inter_robot_loop_sigmas(6);
+  inter_robot_loop_sigmas
+      << inter_robot_loop_rotation_noise_std,
+      inter_robot_loop_rotation_noise_std,
+      inter_robot_loop_rotation_noise_std,
+      inter_robot_loop_translation_noise_std,
+      inter_robot_loop_translation_noise_std,
+      inter_robot_loop_translation_noise_std;
+  auto inter_robot_loop_base_noise =
+      gtsam::noiseModel::Diagonal::Sigmas(inter_robot_loop_sigmas);
+  inter_robot_loop_closure_noise_model_ = gtsam::noiseModel::Robust::Create(
+      gtsam::noiseModel::mEstimator::Huber::Create(inter_robot_loop_huber_k),
+      inter_robot_loop_base_noise);
   pose_graph_ = boost::make_shared<gtsam::NonlinearFactorGraph>();
   current_pose_estimates_ = boost::make_shared<gtsam::Values>();
   odometry_pose_estimates_ = boost::make_shared<gtsam::Values>();
@@ -502,10 +524,13 @@ DecentralizedPGO::DecentralizedPGO(std::shared_ptr<rclcpp::Node> &node)
       node_->get_logger(),
       "[DEBUG_BACKEND_PIPELINE] pose_graph_manager ready ns=%s robot_id=%u max_nb_robots=%u "
       "keyframe_odom_sub=cslam/keyframe_odom optimized_pose_pub=/r%u/cslam/current_pose_estimate "
-      "broadcast_tf=%s opt_start_period_ms=%u opt_loop_period_ms=%u",
+      "broadcast_tf=%s opt_start_period_ms=%u opt_loop_period_ms=%u "
+      "inter_loop_rot_noise=%.3f inter_loop_trans_noise=%.3f inter_loop_huber=%.3f",
       node_->get_namespace(), robot_id_, max_nb_robots_, robot_id_,
       enable_broadcast_tf_frames_ ? "true" : "false",
-      pose_graph_optimization_start_period_ms_, pose_graph_optimization_loop_period_ms_);
+      pose_graph_optimization_start_period_ms_, pose_graph_optimization_loop_period_ms_,
+      inter_robot_loop_rotation_noise_std, inter_robot_loop_translation_noise_std,
+      inter_robot_loop_huber_k);
 
   RCLCPP_INFO(node_->get_logger(), "Initialization done.");
 }
@@ -643,6 +668,10 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
     const cslam_common_interfaces::msg::InterRobotLoopClosure::
         ConstSharedPtr msg)
 {
+  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+  {
+    return;
+  }
   if (msg->success)
   {
     // Registration returns the transform from the matched frame back to the
@@ -657,7 +686,7 @@ void DecentralizedPGO::inter_robot_loop_closure_callback(
 
     gtsam::BetweenFactor<gtsam::Pose3> factor =
         gtsam::BetweenFactor<gtsam::Pose3>(symbol_from, symbol_to, measurement,
-                                           loop_closure_noise_model_);
+                                           inter_robot_loop_closure_noise_model_);
 
     inter_robot_loop_closures_[{std::min(msg->robot0_id, msg->robot1_id),
                                 std::max(msg->robot0_id, msg->robot1_id)}]
@@ -1024,10 +1053,6 @@ bool DecentralizedPGO::check_waiting_timeout()
 
 void DecentralizedPGO::optimization_callback()
 {
-  if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
-  {
-    return;
-  }
   if (optimizer_state_ == OptimizerState::IDLE &&
       odometry_pose_estimates_->size() > 0)
   {
@@ -1036,6 +1061,16 @@ void DecentralizedPGO::optimization_callback()
         "[DEBUG_BACKEND_PIPELINE] optimization cycle trigger odom_values=%lu",
         odometry_pose_estimates_->size());
     reinitialize_received_pose_graphs();
+    if (enable_simulated_rendezvous_ && !sim_rdv_->is_alive())
+    {
+      current_neighbors_ids_.robots.ids.clear();
+      current_neighbors_ids_.origins.ids.clear();
+      optimizer_state_ = OptimizerState::START_OPTIMIZATION;
+      RCLCPP_INFO(
+          node_->get_logger(),
+          "[DEBUG_BACKEND_PIPELINE] rendezvous inactive; starting local-only optimization");
+      return;
+    }
     resquest_current_neighbors();
     start_waiting();
   }
@@ -1615,17 +1650,22 @@ void DecentralizedPGO::optimization_loop_callback()
 
   const bool rendezvous_active =
       !(enable_simulated_rendezvous_ && !sim_rdv_->is_alive());
-  if (!rendezvous_active)
+  if (!rendezvous_active &&
+      (optimizer_state_ == OptimizerState::WAITING_FOR_NEIGHBORS_INFO ||
+       optimizer_state_ == OptimizerState::POSEGRAPH_COLLECTION ||
+       optimizer_state_ == OptimizerState::WAITING_FOR_NEIGHBORS_POSEGRAPHS))
   {
-    if (optimizer_state_ != OptimizerState::IDLE)
-    {
-      end_waiting();
-      optimizer_state_ = OptimizerState::IDLE;
-      reinitialize_received_pose_graphs();
-      other_robots_graph_and_estimates_.clear();
-    }
+    end_waiting();
+    reinitialize_received_pose_graphs();
+    other_robots_graph_and_estimates_.clear();
+    current_neighbors_ids_.robots.ids.clear();
+    current_neighbors_ids_.origins.ids.clear();
+    optimizer_state_ = OptimizerState::START_OPTIMIZATION;
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[DEBUG_BACKEND_PIPELINE] rendezvous became inactive; falling back to local-only optimization");
   }
-  else if (!odometry_pose_estimates_->empty())
+  if (!odometry_pose_estimates_->empty())
   {
     if (optimizer_state_ ==
         OptimizerState::POSEGRAPH_COLLECTION)

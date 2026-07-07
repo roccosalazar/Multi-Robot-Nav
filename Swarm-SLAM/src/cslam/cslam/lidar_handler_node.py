@@ -87,7 +87,11 @@ class LidarHandler:
         
         self.intra_robot_loop_closure_publisher = self.node.create_publisher(IntraRobotLoopClosure, "cslam/intra_robot_loop_closure", 100)
 
-        self.inter_robot_loop_closure_publisher = self.node.create_publisher(InterRobotLoopClosure, "/cslam/inter_robot_loop_closure", 100)
+        self.inter_robot_loop_closure_publisher = self.node.create_publisher(
+            InterRobotLoopClosure,
+            "/cslam/inter_robot_loop_closure_candidates",
+            100,
+        )
 
         self.viz_pointcloud_publisher = self.node.create_publisher(VizPointCloud, "/cslam/viz/keyframe_pointcloud", 100)
 
@@ -97,6 +101,7 @@ class LidarHandler:
 
         self.received_data = []
         self.local_descriptors_map = {}
+        self.local_keyframe_odom_map = {}
         self.nb_local_keyframes = 0
         self.previous_keyframe = None
         self.previous_odom = None
@@ -108,7 +113,11 @@ class LidarHandler:
             f"odom_topic={self.params['frontend.odom_topic']} "
             f"sync_slop_s={self.params['frontend.pointcloud_odom_approx_time_sync_s']} "
             f"keyframe_dist_m={self.params['frontend.keyframe_generation_ratio_distance']} "
-            f"process_period_ms={self.params['frontend.map_manager_process_period_ms']}"
+            f"process_period_ms={self.params['frontend.map_manager_process_period_ms']} "
+            f"registration_timeout_s={self.params['frontend.registration_timeout_sec']} "
+            f"intra_odom_check={self.params['frontend.enable_intra_loop_odom_consistency_check']} "
+            f"intra_odom_max_trans_m={self.params['frontend.intra_loop_odom_consistency_max_translation_m']} "
+            f"intra_odom_max_rot_deg={self.params['frontend.intra_loop_odom_consistency_max_rotation_deg']}"
         )
 
         if self.params["evaluation.enable_logs"]:
@@ -177,10 +186,17 @@ class LidarHandler:
         ]
         if len(alive_match_indices) == 0:
             return
+        if request.keyframe_id not in self.local_keyframe_odom_map:
+            self.node.get_logger().warn(
+                "[DEBUG_LIDAR_PIPELINE] local descriptors request skipped "
+                f"keyframe={request.keyframe_id} reason=missing_odom"
+            )
+            return
         out_msg = LocalPointCloudDescriptors()
         out_msg.data = icp_utils.open3d_to_ros(self.local_descriptors_map[request.keyframe_id])
         out_msg.keyframe_id = request.keyframe_id
         out_msg.robot_id = self.params["robot_id"]
+        out_msg.odom = self.local_keyframe_odom_map[request.keyframe_id]
         out_msg.matches_robot_id = [
             request.matches_robot_id[idx] for idx in alive_match_indices
         ]
@@ -206,39 +222,75 @@ class LidarHandler:
                 frame_ids.append(msg.matches_keyframe_id[i])
         for frame_id in frame_ids:
             pc = self.local_descriptors_map[frame_id]
-            transform, success = icp_utils.compute_transform(
+            self.node.get_logger().info(
+                "[DEBUG_LIDAR_PIPELINE] inter registration start "
+                f"local_keyframe={frame_id} "
+                f"remote_robot={msg.robot_id} remote_keyframe={msg.keyframe_id}"
+            )
+            transform, success = icp_utils.compute_transform_crash_safe(
                 pc,
                 icp_utils.ros_to_open3d(msg.data),
                 self.params["frontend.voxel_size"],
                 self.params["frontend.registration_min_inliers"],
                 self.params["frontend.registration_min_fitness"],
                 self.params["frontend.registration_max_rmse"],
+                self.params["frontend.registration_timeout_sec"],
             )
             out_msg = InterRobotLoopClosure()
             out_msg.robot0_id = self.params["robot_id"]
             out_msg.robot0_keyframe_id = frame_id
             out_msg.robot1_id = msg.robot_id
             out_msg.robot1_keyframe_id = msg.keyframe_id
+            out_msg.has_map_transform = False
             if success:
                 out_msg.success = True
                 out_msg.transform = transform
+                if frame_id in self.local_keyframe_odom_map:
+                    out_msg.has_map_transform = True
+                    out_msg.map_transform = self.inter_robot_map_transform_hypothesis(
+                        frame_id,
+                        msg.odom,
+                        transform,
+                        msg.robot_id,
+                    )
+                else:
+                    self.node.get_logger().warn(
+                        "[DEBUG_LIDAR_PIPELINE] inter registration success "
+                        f"without map transform local_keyframe={frame_id} "
+                        "reason=missing_local_odom"
+                    )
             else:
                 out_msg.success = False
             self.inter_robot_loop_closure_publisher.publish(out_msg)
+            self.node.get_logger().info(
+                "[DEBUG_LIDAR_PIPELINE] inter registration result "
+                f"local_keyframe={frame_id} "
+                f"remote_robot={msg.robot_id} remote_keyframe={msg.keyframe_id} "
+                f"success={success} "
+                f"has_map_transform={out_msg.has_map_transform}"
+            )
 
     def receive_local_keyframe_match(self, msg):
         """Callback for local keyframe match for intra-robot loop closures
         """
         pc0 = self.local_descriptors_map[msg.keyframe0_id]
         pc1 = self.local_descriptors_map[msg.keyframe1_id]
-        transform, success = icp_utils.compute_transform(
+        self.node.get_logger().info(
+            "[DEBUG_LIDAR_PIPELINE] intra registration start "
+            f"keyframe0={msg.keyframe0_id} keyframe1={msg.keyframe1_id}"
+        )
+        transform, success = icp_utils.compute_transform_crash_safe(
             pc0,
             pc1,
             self.params["frontend.voxel_size"],
             self.params["frontend.registration_min_inliers"],
             self.params["frontend.registration_min_fitness"],
             self.params["frontend.registration_max_rmse"],
+            self.params["frontend.registration_timeout_sec"],
         )
+        if success and not self.intra_loop_is_odom_consistent(
+                msg.keyframe0_id, msg.keyframe1_id, transform):
+            success = False
         out_msg = IntraRobotLoopClosure()
         out_msg.keyframe0_id = msg.keyframe0_id
         out_msg.keyframe1_id = msg.keyframe1_id
@@ -248,6 +300,143 @@ class LidarHandler:
         else:
             out_msg.success = False
         self.intra_robot_loop_closure_publisher.publish(out_msg)
+        self.node.get_logger().info(
+            "[DEBUG_LIDAR_PIPELINE] intra registration result "
+            f"keyframe0={msg.keyframe0_id} keyframe1={msg.keyframe1_id} "
+            f"success={success}"
+        )
+
+    def quaternion_to_matrix(self, qx, qy, qz, qw):
+        q = np.array([qx, qy, qz, qw], dtype=float)
+        norm = np.linalg.norm(q)
+        if norm == 0.0 or not np.isfinite(norm):
+            return np.eye(3)
+        x, y, z, w = q / norm
+        return np.array([
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ])
+
+    def transform_matrix(self, translation, rotation):
+        matrix = np.eye(4)
+        matrix[:3, :3] = rotation
+        matrix[:3, 3] = np.asarray(translation, dtype=float)
+        return matrix
+
+    def invert_transform_matrix(self, matrix):
+        inverse = np.eye(4)
+        rotation = matrix[:3, :3]
+        translation = matrix[:3, 3]
+        inverse[:3, :3] = rotation.T
+        inverse[:3, 3] = -(rotation.T @ translation)
+        return inverse
+
+    def odom_to_matrix(self, odom_msg):
+        pose = odom_msg.pose.pose
+        rotation = self.quaternion_to_matrix(
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+            pose.orientation.w,
+        )
+        return self.transform_matrix(
+            [pose.position.x, pose.position.y, pose.position.z],
+            rotation,
+        )
+
+    def transform_msg_to_matrix(self, transform_msg):
+        rotation = self.quaternion_to_matrix(
+            transform_msg.rotation.x,
+            transform_msg.rotation.y,
+            transform_msg.rotation.z,
+            transform_msg.rotation.w,
+        )
+        return self.transform_matrix(
+            [
+                transform_msg.translation.x,
+                transform_msg.translation.y,
+                transform_msg.translation.z,
+            ],
+            rotation,
+        )
+
+    def matrix_to_transform_msg(self, matrix):
+        return icp_utils.to_transform_msg(matrix[:3, 3], matrix[:3, :3])
+
+    def inter_robot_map_transform_hypothesis(self, local_keyframe_id,
+                                             remote_odom_msg, transform,
+                                             remote_robot_id):
+        local_odom = self.odom_to_matrix(
+            self.local_keyframe_odom_map[local_keyframe_id])
+        remote_odom = self.odom_to_matrix(remote_odom_msg)
+        registration = self.transform_msg_to_matrix(transform)
+        measurement = self.invert_transform_matrix(registration)
+        map_transform = (
+            local_odom @ measurement @ self.invert_transform_matrix(remote_odom)
+        )
+        if self.params["robot_id"] > remote_robot_id:
+            map_transform = self.invert_transform_matrix(map_transform)
+        return self.matrix_to_transform_msg(map_transform)
+
+    def transform_residual(self, estimate, reference):
+        translation_error = np.linalg.norm(estimate[:3, 3] - reference[:3, 3])
+        rotation_error = estimate[:3, :3].T @ reference[:3, :3]
+        cos_angle = (np.trace(rotation_error) - 1.0) * 0.5
+        angle_error = np.degrees(np.arccos(np.clip(cos_angle, -1.0, 1.0)))
+        return float(translation_error), float(angle_error)
+
+    def intra_loop_is_odom_consistent(self, keyframe0_id, keyframe1_id, transform):
+        if not self.params["frontend.enable_intra_loop_odom_consistency_check"]:
+            return True
+
+        if (keyframe0_id not in self.local_keyframe_odom_map or
+                keyframe1_id not in self.local_keyframe_odom_map):
+            self.node.get_logger().warn(
+                "[DEBUG_LIDAR_PIPELINE] intra registration rejected by odom consistency "
+                f"keyframe0={keyframe0_id} keyframe1={keyframe1_id} reason=missing_odom"
+            )
+            return False
+
+        odom0 = self.odom_to_matrix(self.local_keyframe_odom_map[keyframe0_id])
+        odom1 = self.odom_to_matrix(self.local_keyframe_odom_map[keyframe1_id])
+        odom_relative = self.invert_transform_matrix(odom0) @ odom1
+        registration = self.transform_msg_to_matrix(transform)
+
+        candidates = [
+            self.transform_residual(registration, odom_relative),
+            self.transform_residual(self.invert_transform_matrix(registration), odom_relative),
+        ]
+        best_translation_error, best_rotation_error = min(
+            candidates,
+            key=lambda residual: (
+                residual[0],
+                residual[1],
+            ),
+        )
+
+        max_translation_error = self.params[
+            "frontend.intra_loop_odom_consistency_max_translation_m"]
+        max_rotation_error = self.params[
+            "frontend.intra_loop_odom_consistency_max_rotation_deg"]
+        consistent = (
+            best_translation_error <= max_translation_error and
+            best_rotation_error <= max_rotation_error
+        )
+        log_msg = (
+            "[DEBUG_LIDAR_PIPELINE] intra registration odom consistency "
+            f"keyframe0={keyframe0_id} keyframe1={keyframe1_id} "
+            f"trans_error_m={best_translation_error:.3f} "
+            f"rot_error_deg={best_rotation_error:.3f} "
+            f"max_trans_m={max_translation_error:.3f} "
+            f"max_rot_deg={max_rotation_error:.3f} "
+            f"consistent={consistent}"
+        )
+        if consistent:
+            self.node.get_logger().info(log_msg)
+        else:
+            self.node.get_logger().warn(log_msg)
+        return consistent
 
     def odom_distance_squared(self, odom0, odom1):
         """Compute the squared distance between two odometry messages
@@ -317,6 +506,7 @@ class LidarHandler:
                 msg_odom.odom = data[1]
                 if self.params["evaluation.enable_gps_recording"]:
                     msg_odom.gps = gps
+                self.local_keyframe_odom_map[self.nb_local_keyframes] = data[1]
                 self.keyframe_odom_publisher.publish(msg_odom)
                 if self.params["visualization.enable"]:
                     viz_msg = VizPointCloud()
@@ -361,6 +551,10 @@ if __name__ == '__main__':
                         ('frontend.registration_min_inliers', 60),
                         ('frontend.registration_min_fitness', 0.0),
                         ('frontend.registration_max_rmse', 1.0),
+                        ('frontend.registration_timeout_sec', 30.0),
+                        ('frontend.enable_intra_loop_odom_consistency_check', True),
+                        ('frontend.intra_loop_odom_consistency_max_translation_m', 8.0),
+                        ('frontend.intra_loop_odom_consistency_max_rotation_deg', 45.0),
                         ('frontend.keyframe_generation_ratio_distance', 0.5),
                         ('frontend.pointcloud_odom_approx_time_sync_s', 0.1),
                         ('robot_id', 0),           
@@ -388,6 +582,14 @@ if __name__ == '__main__':
         'frontend.registration_min_fitness').value
     params['frontend.registration_max_rmse'] = node.get_parameter(
         'frontend.registration_max_rmse').value
+    params['frontend.registration_timeout_sec'] = node.get_parameter(
+        'frontend.registration_timeout_sec').value
+    params['frontend.enable_intra_loop_odom_consistency_check'] = node.get_parameter(
+        'frontend.enable_intra_loop_odom_consistency_check').value
+    params['frontend.intra_loop_odom_consistency_max_translation_m'] = node.get_parameter(
+        'frontend.intra_loop_odom_consistency_max_translation_m').value
+    params['frontend.intra_loop_odom_consistency_max_rotation_deg'] = node.get_parameter(
+        'frontend.intra_loop_odom_consistency_max_rotation_deg').value
     params['frontend.keyframe_generation_ratio_distance'] = node.get_parameter(
         'frontend.keyframe_generation_ratio_distance').value
     params['frontend.pointcloud_odom_approx_time_sync_s'] = node.get_parameter(

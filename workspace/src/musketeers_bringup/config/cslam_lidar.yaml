@@ -9,9 +9,18 @@
       registration_min_inliers: 32
       registration_min_fitness: 0.62
       registration_max_rmse: 0.30
+      registration_timeout_sec: 30.0
+      enable_intra_loop_odom_consistency_check: true
+      intra_loop_odom_consistency_max_translation_m: 8.0
+      intra_loop_odom_consistency_max_rotation_deg: 45.0
       similarity_threshold: 0.85
 
       inter_robot_loop_closure_budget: 1
+      enable_inter_loop_consistency_check: true
+      inter_loop_consistency_min_cluster_size: 3
+      inter_loop_consistency_max_translation_m: 2.0
+      inter_loop_consistency_max_rotation_deg: 5.0
+      inter_loop_consistency_max_pending_edges: 100
       inter_robot_detection_period_sec: 5
       enable_sparsification: true
       max_queue_size: 10
@@ -38,6 +47,9 @@
       pose_graph_optimization_loop_period_ms: 100
       max_waiting_time_sec: 5
       enable_broadcast_tf_frames: true
+      inter_robot_loop_rotation_noise_std: 0.10
+      inter_robot_loop_translation_noise_std: 1.00
+      inter_robot_loop_huber_k: 1.0
     evaluation:
       enable_logs: false
       log_folder: "results"
